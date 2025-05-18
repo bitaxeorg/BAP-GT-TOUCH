@@ -1,0 +1,27 @@
+dependencies:
+  espressif__esp_lcd_touch:
+    component_hash: null
+    source:
+      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\espressif__esp_lcd_touch
+      type: local
+    version: 1.1.2
+  espressif__esp_lcd_touch_gt911:
+    component_hash: null
+    source:
+      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\espressif__esp_lcd_touch_gt911
+      type: local
+    version: 1.1.1~1
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 5.2.1
+  lvgl__lvgl:
+    component_hash: null
+    source:
+      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\lvgl__lvgl
+      type: local
+    version: 8.4.0
+manifest_hash: d48744edbafa1472651979889215d113b364cec181ef96345ec34a454387eabe
+target: esp32s3
+version: 1.0.0
