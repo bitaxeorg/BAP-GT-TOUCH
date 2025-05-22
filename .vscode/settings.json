@@ -1,7 +1,7 @@
 {
     "idf.espIdfPathWin": "C:\\Users\\wilso\\esp\\v5.2.1\\esp-idf",
     "idf.toolsPathWin": "C:\\Users\\wilso\\.espressif",
-    "idf.pythonInstallPath": "C:\\Users\\wilso\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
+    "idf.pythonInstallPath": "/usr/bin/python3",
     "idf.portWin": "COM3",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
@@ -12,5 +12,8 @@
         "ESP_ROM_ELF_DIR": "C:\\Users\\wilso\\.espressif\\tools\\esp-rom-elfs\\20240305/",
         "IDF_TARGET": "esp32s3"
     },
-    "idf.flashType": "UART"
+    "idf.flashType": "UART",
+    "idf.espIdfPath": "/Users/benjaminwilson/esp/v5.1.4/esp-idf",
+    "idf.toolsPath": "/Users/benjaminwilson/.espressif",
+    "idf.port": "/dev/tty.usbmodem58A70046281"
 }

@@ -1,27 +1,31 @@
 dependencies:
-  espressif__esp_lcd_touch:
-    component_hash: null
+  espressif/esp_lcd_touch:
+    dependencies: []
     source:
-      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\espressif__esp_lcd_touch
+      path: /Users/benjaminwilson/Dev/4.3LCD-ST7262-GT911/components/espressif__esp_lcd_touch
       type: local
     version: 1.1.2
-  espressif__esp_lcd_touch_gt911:
-    component_hash: null
+  espressif/esp_lcd_touch_gt911:
+    dependencies: []
     source:
-      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\espressif__esp_lcd_touch_gt911
+      path: /Users/benjaminwilson/Dev/4.3LCD-ST7262-GT911/components/espressif__esp_lcd_touch_gt911
       type: local
     version: 1.1.1~1
   idf:
-    component_hash: null
     source:
       type: idf
-    version: 5.2.1
-  lvgl__lvgl:
-    component_hash: null
+    version: 5.1.4
+  lvgl/lvgl:
+    dependencies: []
     source:
-      path: C:\Users\wilso\Downloads\ESP32-S3-Touch-LCD-4.3-Demo\ESP32-S3-Touch-LCD-4.3-Demo\ESP-IDF\08_lvgl_Porting\components\lvgl__lvgl
+      path: /Users/benjaminwilson/Dev/4.3LCD-ST7262-GT911/components/lvgl__lvgl
       type: local
     version: 8.4.0
-manifest_hash: d48744edbafa1472651979889215d113b364cec181ef96345ec34a454387eabe
+direct_dependencies:
+- espressif/esp_lcd_touch
+- espressif/esp_lcd_touch_gt911
+- idf
+- lvgl/lvgl
+manifest_hash: d5d266152de678f38563fb78535c96ea22d9ead88642e70bb4e988de7ac24ddd
 target: esp32s3
-version: 1.0.0
+version: 2.0.0
