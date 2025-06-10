@@ -51,20 +51,40 @@ void gpio_init(void)
     gpio_config(&io_conf);
 }
 
+// This translates the GPIO expander output byte into the ESP32 IO signals that need to be set
+void set_ext_to_io(uint8_t value)
+{
+    uint8_t io_11_val, io_12_val, io_13_val;
+
+    io_11_val = (value & 0x02) >> 1;
+    io_12_val = (value & 0x04) >> 2;
+    io_13_val = (value & 0x08) >> 3;
+
+    gpio_set_level(GPIO_NUM_11, io_11_val);
+    gpio_set_level(EXAMPLE_LCD_IO_RGB_DISP, io_12_val);
+    gpio_set_level(EXAMPLE_LCD_IO_RST, io_13_val);
+
+}
+
+
 // Reset the touch screen
 void waveshare_esp32_s3_touch_reset()
 {
-    uint8_t write_buf = 0x01;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //uint8_t write_buf = 0x01;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
     // Reset the touch screen. It is recommended to reset the touch screen before using it.
-    write_buf = 0x2C;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //write_buf = 0x2C;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    set_ext_to_io(0x2C);
+
     esp_rom_delay_us(100 * 1000);
     gpio_set_level(GPIO_INPUT_IO_4, 0);
     esp_rom_delay_us(100 * 1000);
-    write_buf = 0x2E;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+
+    //write_buf = 0x2E;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    set_ext_to_io(0x2E);
     esp_rom_delay_us(200 * 1000);
 }
 
@@ -184,12 +204,14 @@ esp_err_t waveshare_esp32_s3_rgb_lcd_init()
 esp_err_t wavesahre_rgb_lcd_bl_on()
 {
     //Configure CH422G to output mode 
-    uint8_t write_buf = 0x01;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //uint8_t write_buf = 0x01;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
     //Pull the backlight pin high to light the screen backlight 
-    write_buf = 0x1E;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //write_buf = 0x1E;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    set_ext_to_io(0x1E);
+
     return ESP_OK;
 }
 
@@ -197,12 +219,14 @@ esp_err_t wavesahre_rgb_lcd_bl_on()
 esp_err_t wavesahre_rgb_lcd_bl_off()
 {
     //Configure CH422G to output mode 
-    uint8_t write_buf = 0x01;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //uint8_t write_buf = 0x01;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x24, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
     //Turn off the screen backlight by pulling the backlight pin low 
-    write_buf = 0x1A;
-    i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    //write_buf = 0x1A;
+    //i2c_master_write_to_device(I2C_MASTER_NUM, 0x38, &write_buf, 1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    set_ext_to_io(0x1A);
+
     return ESP_OK;
 }
 
