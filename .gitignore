@@ -1,0 +1,41 @@
+# Build artifacts
+/build
+/cmake-build-*
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# ESP-IDF specific files
+sdkconfig
+sdkconfig.old
+/partition_table/
+/managed_components/
+/dependencies.lock
+
+# ELF files
+*.elf
+
+# Flasher args file
+flasher_args.json
+
+# Configuration backup files
+*.bak
+
+# Python cache files
+__pycache__
+*.pyc
+
+# Log files
+*.log
+
+# CMake files
+/cmake-build-*/
+compile_commands.json
+
+# Temporary files
+*.tmp
+.DS_Store
