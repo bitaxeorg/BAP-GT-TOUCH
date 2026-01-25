@@ -28,6 +28,8 @@ static bool subscribed_fan_rpm = false;
 static bool subscribed_shares = false;
 static bool subscribed_best_difficulty = false;
 static bool subscribed_wifi = false;
+static bool subscribed_block_height = false;
+static bool subscribed_wifi_password = false;
 static uint32_t last_response_time = 0;
 
 static void uart_send_task(void *pvParameters);
@@ -253,6 +255,8 @@ void bap_client_reset_connection_state(void) {
     subscribed_shares = false;
     subscribed_best_difficulty = false;
     subscribed_wifi = false;
+    subscribed_block_height = false;
+    subscribed_wifi_password = false;
     last_response_time = 0;
 }
 
@@ -294,6 +298,34 @@ static esp_err_t bap_subscribe_wifi(void) {
     if (ret == ESP_OK) {
         subscribed_wifi = true;
         ESP_LOGI(TAG, "Subscribed to WiFi");
+    }
+    return ret;
+}
+
+static esp_err_t bap_subscribe_block_height(void) {
+    if (subscribed_block_height) {
+        ESP_LOGW(TAG, "Already subscribed to block height, skipping");
+        return ESP_OK;
+    }
+
+    esp_err_t ret = bap_client_subscribe("block_height");
+    if (ret == ESP_OK) {
+        subscribed_block_height = true;
+        ESP_LOGI(TAG, "Subscribed to block height");
+    }
+    return ret;
+}
+
+static esp_err_t bap_subscribe_wifi_password(void) {
+    if (subscribed_wifi_password) {
+        ESP_LOGW(TAG, "Already subscribed to WiFi password, skipping");
+        return ESP_OK;
+    }
+
+    esp_err_t ret = bap_client_subscribe("wifi_password");
+    if (ret == ESP_OK) {
+        subscribed_wifi_password = true;
+        ESP_LOGI(TAG, "Subscribed to WiFi password");
     }
     return ret;
 }
@@ -391,6 +423,10 @@ static void uart_send_task(void *pvParameters) {
     bap_subscribe_best_difficulty();
     vTaskDelay(pdMS_TO_TICKS(100));  // Wait a bit before next subscription
     bap_subscribe_wifi();
+    vTaskDelay(pdMS_TO_TICKS(100));  // Wait a bit before next subscription
+    bap_subscribe_block_height();
+    vTaskDelay(pdMS_TO_TICKS(100));  // Wait a bit before next subscription
+    bap_subscribe_wifi_password();
     vTaskDelay(pdMS_TO_TICKS(100));  // Wait a bit
     bap_request_system_info();
     

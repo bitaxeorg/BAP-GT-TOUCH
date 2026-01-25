@@ -13,6 +13,7 @@
 #include "bap_protocol.h"
 #include "home.h"
 #include "wifi.h"
+#include "block.h"
 #include "lvgl_port.h"
 
 static const char *TAG = "BAP_PARSER";
@@ -95,6 +96,10 @@ esp_err_t bap_handle_response(const bap_message_t *msg) {
         ret = bap_handle_wifi_rssi_response(msg->value);
     } else if (strcmp(msg->parameter, "wifi_ip") == 0) {
         ret = bap_handle_wifi_ip_response(msg->value);
+    } else if (strcmp(msg->parameter, "wifi_password") == 0) {
+        ret = bap_handle_wifi_password_response(msg->value);
+    } else if (strcmp(msg->parameter, "block_height") == 0) {
+        ret = bap_handle_block_height_response(msg->value);
     } else if (strcmp(msg->parameter, "mode") == 0) {
         ret = bap_handle_mode(msg->value);
     } else {
@@ -115,12 +120,9 @@ esp_err_t bap_handle_hashrate_response(const char *value) {
     if (lvgl_port_lock(100)) {
         home_update_hashrate(value);
         
-        // Also update night mode screen if it exists
-        extern lv_obj_t* night_get_screen(void);
-        if (night_get_screen()) {
-            extern void night_update_hashrate(const char* hashrate);
-            night_update_hashrate(value);
-        }
+        // Update night mode cache even when the screen is not active
+        extern void night_update_hashrate(const char* hashrate);
+        night_update_hashrate(value);
         
         lvgl_port_unlock();
         return ESP_OK;
@@ -359,6 +361,40 @@ esp_err_t bap_handle_wifi_ip_response(const char *value) {
         return ESP_OK;
     } else {
         ESP_LOGW(TAG, "Failed to acquire LVGL mutex for WiFi IP update");
+        return ESP_ERR_TIMEOUT;
+    }
+}
+
+esp_err_t bap_handle_wifi_password_response(const char *value) {
+    if (!value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Received WiFi password");
+
+    if (lvgl_port_lock(100)) {
+        wifi_update_password(value);
+        lvgl_port_unlock();
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG, "Failed to acquire LVGL mutex for WiFi password update");
+        return ESP_ERR_TIMEOUT;
+    }
+}
+
+esp_err_t bap_handle_block_height_response(const char *value) {
+    if (!value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Received block height: %s", value);
+
+    if (lvgl_port_lock(100)) {
+        block_update_height(value);
+        lvgl_port_unlock();
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG, "Failed to acquire LVGL mutex for block height update");
         return ESP_ERR_TIMEOUT;
     }
 }

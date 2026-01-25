@@ -22,13 +22,16 @@ typedef struct {
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 480
 
-// Colors
-#define COLOR_BACKGROUND    lv_color_hex(0x2B3A4A)
-#define COLOR_CARD_BG       lv_color_hex(0x3C4F5F)
-#define COLOR_ACCENT        lv_color_hex(0xF4D03F)
-#define COLOR_RED           lv_color_hex(0xFF0000)
+// Colors (Bitaxe site theme)
+#define COLOR_BACKGROUND    lv_color_hex(0x050506)
+#define COLOR_CARD_BG       lv_color_hex(0x0F1218)
+#define COLOR_ACCENT        lv_color_hex(0xD4021B)
+#define COLOR_RED           lv_color_hex(0xD4021B)
 #define COLOR_TEXT_PRIMARY  lv_color_hex(0xFFFFFF)
-#define COLOR_TEXT_SECONDARY lv_color_hex(0xBDC3C7)
+#define COLOR_TEXT_SECONDARY lv_color_hex(0xA3A3A3)
+#define COLOR_TEXT_ON_ACCENT lv_color_hex(0x000000)
+#define COLOR_BORDER        lv_color_hex(0x1A1D24)
+#define COLOR_NAV_BG        lv_color_hex(0x0C0F14)
 
 // Function declarations
 void home_screen_create(void);
@@ -56,5 +59,9 @@ void home_pool_clicked(lv_event_t * e);
 void home_settings_clicked(lv_event_t * e);
 void home_night_clicked(lv_event_t * e);
 void home_wifi_clicked(lv_event_t * e);
+void home_block_clicked(lv_event_t * e);
+void home_clock_clicked(lv_event_t * e);
+void home_price_clicked(lv_event_t * e);
+void home_mempool_clicked(lv_event_t * e);
 
 #endif // HOME_H

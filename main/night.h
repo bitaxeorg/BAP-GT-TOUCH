@@ -11,6 +11,10 @@ void night_update_hashrate(const char* hashrate);
 
 // Event handlers
 void night_home_clicked(lv_event_t * e);
+void night_block_clicked(lv_event_t * e);
+void night_clock_clicked(lv_event_t * e);
+void night_price_clicked(lv_event_t * e);
+void night_mempool_clicked(lv_event_t * e);
 void night_wifi_clicked(lv_event_t * e);
 void night_settings_clicked(lv_event_t * e);
 

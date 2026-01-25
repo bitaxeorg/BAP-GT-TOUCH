@@ -28,7 +28,12 @@ void settings_auto_fan_toggled(lv_event_t * e);
 void settings_fan_slider_changed(lv_event_t * e);
 void settings_fan_save_clicked(lv_event_t * e);
 void settings_brightness_slider_changed(lv_event_t * e);
+void settings_timezone_changed(lv_event_t * e);
 void settings_home_clicked(lv_event_t * e);
+void settings_block_clicked(lv_event_t * e);
+void settings_clock_clicked(lv_event_t * e);
+void settings_price_clicked(lv_event_t * e);
+void settings_mempool_clicked(lv_event_t * e);
 void settings_wifi_clicked(lv_event_t * e);
 void settings_night_clicked(lv_event_t * e);
 

@@ -27,12 +27,18 @@ lv_obj_t* wifi_get_screen(void);
 void wifi_update_ssid(const char* ssid);
 void wifi_update_rssi(const char* rssi);
 void wifi_update_ip(const char* ip);
+void wifi_update_password(const char* password);
+bool wifi_is_connected(void);
 
 // Event handlers
 void wifi_connect_clicked(lv_event_t * e);
 void wifi_disconnect_clicked(lv_event_t * e);
 void wifi_scan_clicked(lv_event_t * e);
 void wifi_home_clicked(lv_event_t * e);
+void wifi_block_clicked(lv_event_t * e);
+void wifi_clock_clicked(lv_event_t * e);
+void wifi_price_clicked(lv_event_t * e);
+void wifi_mempool_clicked(lv_event_t * e);
 void wifi_settings_clicked(lv_event_t * e);
 void wifi_night_clicked(lv_event_t * e);
 

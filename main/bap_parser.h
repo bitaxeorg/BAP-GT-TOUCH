@@ -128,6 +128,20 @@ esp_err_t bap_handle_wifi_rssi_response(const char *value);
 esp_err_t bap_handle_wifi_ip_response(const char *value);
 
 /**
+ * @brief Handle WiFi password response
+ * @param value WiFi password string
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t bap_handle_wifi_password_response(const char *value);
+
+/**
+ * @brief Handle block height response
+ * @param value Block height string
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t bap_handle_block_height_response(const char *value);
+
+/**
  * @brief Handle mode response
  * @param value Mode string
  * @return ESP_OK on success, error code otherwise
