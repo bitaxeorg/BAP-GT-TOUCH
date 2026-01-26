@@ -25,6 +25,7 @@ static wifi_ap_record_t *scan_results = NULL;
 static uint16_t scan_count = 0;
 static bool scan_in_progress = false;
 static bool scan_completed = false;
+static bool scan_event_received = false;
 
 static lv_obj_t * wifi_screen = NULL;
 static lv_obj_t * ssid_label = NULL;
@@ -177,6 +178,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 {
     LV_UNUSED(arg);
 
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        ESP_LOGI(TAG, "WIFI_EVENT_SCAN_DONE received");
+        // Set flag for LVGL task to process - don't call handler from event context
+        // (event task has small stack, LVGL operations must be on LVGL task)
+        scan_event_received = true;
+        return;
+    }
+
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         if (wifi_connect_pending) {
             esp_wifi_connect();
@@ -282,21 +291,12 @@ static esp_err_t wifi_init_for_scan(void)
 // Check scan completion (called from LVGL task)
 static void wifi_check_scan_completion(void)
 {
-    if(!scan_in_progress || scan_completed) {
-        return;
-    }
-    
-    // Check if scan is done
-    esp_err_t ret = esp_wifi_scan_get_ap_num(&scan_count);
-    
-    if(ret == ESP_OK) {
-        // Scan is complete
+    // Process scan completion when event was received
+    // This runs in LVGL task context where it's safe to update UI and allocate memory
+    if (scan_event_received && scan_in_progress && !scan_completed) {
+        scan_event_received = false;
+        esp_wifi_scan_get_ap_num(&scan_count);
         scan_completed = true;
-        wifi_scan_done_handler();
-    } else if(ret == ESP_ERR_WIFI_NOT_STARTED) {
-        ESP_LOGE(TAG, "WiFi not started");
-        scan_completed = true;
-        scan_count = 0;
         wifi_scan_done_handler();
     }
 }
@@ -595,7 +595,8 @@ void wifi_screen_destroy(void)
         }
         scan_in_progress = false;
         scan_completed = false;
-        
+        scan_event_received = false;
+
         lv_obj_del(wifi_screen);
         wifi_screen = NULL;
         ssid_label = NULL;
@@ -867,7 +868,8 @@ void wifi_scan_clicked(lv_event_t * e)
     
     scan_in_progress = true;
     scan_completed = false;
-    
+    scan_event_received = false;
+
     // Start the WiFi scan (asynchronous)
     ret = esp_wifi_scan_start(&scan_config, false);
     if(ret != ESP_OK) {
