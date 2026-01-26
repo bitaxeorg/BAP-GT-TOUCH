@@ -1,0 +1,40 @@
+{
+    "name": "ESP-IDF 5.4.1 Development",
+    "image": "espressif/idf:v5.4.1",
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "espressif.esp-idf-extension",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools"
+            ],
+            "settings": {
+                "idf.espIdfPath": "/opt/esp/idf",
+                "idf.toolsPath": "/opt/esp",
+                "idf.pythonBinPath": "/opt/esp/python_env/idf5.4_py3.12_env/bin/python",
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash",
+                        "args": ["-l"]
+                    }
+                }
+            }
+        }
+    },
+    "containerEnv": {
+        "IDF_PATH": "/opt/esp/idf",
+        "IDF_TOOLS_PATH": "/opt/esp"
+    },
+    "postCreateCommand": "echo '. /opt/esp/idf/export.sh' >> ~/.bashrc",
+    "runArgs": [
+        "--privileged",
+        "--device=/dev/bus/usb:/dev/bus/usb"
+    ],
+    "mounts": [
+        "source=/dev/bus/usb,target=/dev/bus/usb,type=bind"
+    ],
+    "remoteUser": "root"
+}
