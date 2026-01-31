@@ -81,7 +81,7 @@ void clock_screen_create(void)
     lv_obj_set_flex_align(bottom_nav, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, clock_home_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, clock_block_clicked, false);
+    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, clock_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, clock_mempool_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, NULL, true);
     create_bottom_nav_btn(bottom_nav, "$", clock_price_clicked, false);

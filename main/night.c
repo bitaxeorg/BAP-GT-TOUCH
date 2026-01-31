@@ -305,7 +305,7 @@ static void create_bottom_nav(void)
     lv_obj_set_flex_align(bottom_nav, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, night_home_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, night_block_clicked, false);
+    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, night_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, night_mempool_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, night_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", night_price_clicked, false);

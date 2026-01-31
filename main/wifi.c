@@ -576,7 +576,7 @@ void wifi_screen_create(void)
     
     // Bottom navigation buttons
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, wifi_home_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, wifi_block_clicked, false);
+    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, wifi_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, wifi_mempool_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, wifi_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", wifi_price_clicked, false);

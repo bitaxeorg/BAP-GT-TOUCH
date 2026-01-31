@@ -168,7 +168,7 @@ void mempool_screen_create(void)
     lv_obj_set_flex_align(bottom_nav, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, mempool_home_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, mempool_block_clicked, false);
+    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, mempool_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, NULL, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, mempool_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", mempool_price_clicked, false);
