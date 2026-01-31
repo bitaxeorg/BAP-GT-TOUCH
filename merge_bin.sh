@@ -105,7 +105,7 @@ print_info "Creating merged binary..."
 
 esptool.py --chip esp32s3 merge_bin \
     --flash_mode dio \
-    --flash_size 8MB \
+    --flash_size 16MB \
     --flash_freq 80m \
     $BOOTLOADER_ADDR "$BOOTLOADER_BIN" \
     $PARTITION_TABLE_ADDR "$PARTITION_TABLE" \
