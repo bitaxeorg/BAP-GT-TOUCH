@@ -64,7 +64,7 @@ void block_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, NULL, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, block_mempool_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, block_clock_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_BARS, block_price_clicked, false);
+    create_bottom_nav_btn(bottom_nav, "$", block_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, block_wifi_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, block_settings_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_EYE_OPEN, block_night_clicked, false);

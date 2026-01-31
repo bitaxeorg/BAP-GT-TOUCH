@@ -512,7 +512,7 @@ void home_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_GPS, home_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, home_mempool_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, home_clock_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_BARS, home_price_clicked, false);
+    create_bottom_nav_btn(bottom_nav, "$", home_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, home_wifi_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, home_settings_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_EYE_OPEN, home_night_clicked, false);
