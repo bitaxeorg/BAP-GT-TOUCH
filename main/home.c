@@ -536,7 +536,7 @@ void home_screen_create(void)
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, NULL, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, home_block_clicked, false);
-    create_bottom_nav_btn(bottom_nav, &cube_solid_full, home_mempool_clicked, false);
+    create_bottom_nav_btn_img(bottom_nav, &cube_solid_full, home_mempool_clicked, false);
     create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, home_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", home_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, home_wifi_clicked, false);

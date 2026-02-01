@@ -83,7 +83,7 @@ void clock_screen_create(void)
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, clock_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, clock_block_clicked, false);
-    create_bottom_nav_btn(bottom_nav, &cube_solid_full, clock_mempool_clicked, false);
+    create_bottom_nav_btn_img(bottom_nav, &cube_solid_full, clock_mempool_clicked, false);
     create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, NULL, true);
     create_bottom_nav_btn(bottom_nav, "$", clock_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, clock_wifi_clicked, false);

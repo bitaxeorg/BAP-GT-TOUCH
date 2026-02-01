@@ -171,7 +171,7 @@ void mempool_screen_create(void)
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, mempool_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, mempool_block_clicked, false);
-    create_bottom_nav_btn(bottom_nav, &cube_solid_full, NULL, true);
+    create_bottom_nav_btn_img(bottom_nav, &cube_solid_full, NULL, true);
     create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, mempool_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", mempool_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, mempool_wifi_clicked, false);
