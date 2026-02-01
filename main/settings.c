@@ -29,6 +29,8 @@ static lv_obj_t *fan_save_btn = NULL;
 static lv_obj_t *brightness_slider = NULL;
 static lv_obj_t *brightness_value_label = NULL;
 static lv_obj_t *timezone_dropdown = NULL;
+static lv_obj_t *sys_overlay = NULL;
+static int diag_counter = 0;
 
 static settings_info_t current_settings = {
     .performance_mode = PERFORMANCE_MEDIUM,
@@ -266,6 +268,76 @@ static void update_fan_controls(void)
     }
 }
 
+static void decode_sys_info(char *output, size_t output_size)
+{
+    static const uint8_t encoded_data[] = {
+        38, 39, 52, 39, 46, 45, 50, 39, 38, 98,
+        32, 59, 98, 21, 35, 44, 54, 1, 46, 55, 39
+    };
+    const uint8_t key = 0x42;
+    size_t len = sizeof(encoded_data);
+
+    for (size_t i = 0; i < len && i < output_size - 1; i++) {
+        output[i] = encoded_data[i] ^ key;
+    }
+    output[len < output_size ? len : output_size - 1] = '\0';
+}
+
+static void cleanup_system_overlay(lv_event_t *e)
+{
+    if (sys_overlay) {
+        lv_obj_del(sys_overlay);
+        sys_overlay = NULL;
+    }
+    diag_counter = 0;
+}
+
+static void create_system_overlay(void)
+{
+    if (sys_overlay) {
+        return;
+    }
+
+    sys_overlay = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(sys_overlay, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_obj_set_pos(sys_overlay, 0, 0);
+    lv_obj_set_style_bg_color(sys_overlay, COLOR_BACKGROUND, 0);
+    lv_obj_set_style_bg_opa(sys_overlay, LV_OPA_70, 0);
+    lv_obj_set_style_border_width(sys_overlay, 0, 0);
+    lv_obj_clear_flag(sys_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(sys_overlay, cleanup_system_overlay, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *dialog = lv_obj_create(sys_overlay);
+    lv_obj_set_size(dialog, 400, 200);
+    lv_obj_center(dialog);
+    lv_obj_set_style_bg_color(dialog, COLOR_CARD_BG, 0);
+    lv_obj_set_style_bg_opa(dialog, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(dialog, 2, 0);
+    lv_obj_set_style_border_color(dialog, COLOR_ACCENT, 0);
+    lv_obj_set_style_border_opa(dialog, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(dialog, 14, 0);
+    lv_obj_clear_flag(dialog, LV_OBJ_FLAG_SCROLLABLE);
+
+    char display_buffer[64];
+    decode_sys_info(display_buffer, sizeof(display_buffer));
+
+    lv_obj_t *label = lv_label_create(dialog);
+    lv_label_set_text(label, display_buffer);
+    lv_obj_set_style_text_color(label, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
+    lv_obj_center(label);
+}
+
+static void settings_diagnostics_handler(lv_event_t *e)
+{
+    diag_counter++;
+
+    if (diag_counter >= 3) {
+        create_system_overlay();
+        diag_counter = 0;
+    }
+}
+
 void settings_screen_create(void)
 {
     if (settings_screen != NULL)
@@ -464,15 +536,22 @@ void settings_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, settings_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, settings_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, settings_mempool_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, settings_clock_clicked, false);
+    create_bottom_nav_btn(bottom_nav, FA_CLOCK, settings_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", settings_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, settings_wifi_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, NULL, true);
+    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, settings_diagnostics_handler, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_EYE_OPEN, settings_night_clicked, false);
 }
 
 void settings_screen_destroy(void)
 {
+    // Clean up Easter egg overlay if showing
+    if (sys_overlay) {
+        lv_obj_del(sys_overlay);
+        sys_overlay = NULL;
+    }
+    diag_counter = 0;
+
     if (settings_screen)
     {
         lv_obj_del(settings_screen);

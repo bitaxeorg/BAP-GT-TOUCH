@@ -307,7 +307,7 @@ static void create_bottom_nav(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, night_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, night_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, night_mempool_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, night_clock_clicked, false);
+    create_bottom_nav_btn(bottom_nav, FA_CLOCK, night_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", night_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, night_wifi_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, night_settings_clicked, false);

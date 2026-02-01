@@ -141,7 +141,7 @@ void price_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, price_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, price_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, price_mempool_clicked, false);
-    create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LOOP, price_clock_clicked, false);
+    create_bottom_nav_btn(bottom_nav, FA_CLOCK, price_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", NULL, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, price_wifi_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, price_settings_clicked, false);

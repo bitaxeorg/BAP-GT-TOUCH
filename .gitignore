@@ -40,3 +40,7 @@ compile_commands.json
 # Temporary files
 *.tmp
 .DS_Store
+
+
+# Node Modules
+node_modules/

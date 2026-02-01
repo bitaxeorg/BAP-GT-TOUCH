@@ -9,7 +9,11 @@ LV_FONT_DECLARE(untyped_96);
 LV_FONT_DECLARE(Nevan_RUS_96);
 LV_FONT_DECLARE(montserrat_120);
 LV_FONT_DECLARE(montserrat_140);
+LV_FONT_DECLARE(fa_clock_18);
 // LV_FONT_DECLARE(angelwish_48);
 // LV_FONT_DECLARE(angelwish_24);
+
+// Font Awesome icons
+#define FA_CLOCK "\xEF\x80\x97"  // Unicode 0xF017 (fa-clock)
 
 #endif // CUSTOM_FONTS_H
