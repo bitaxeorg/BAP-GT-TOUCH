@@ -17,6 +17,7 @@ static lv_obj_t *block_title_label = NULL;
 static char current_block_height_text[24] = "0000000";
 
 static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_event_cb_t event_cb, bool active);
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active);
 static void apply_cached_block_height(void);
 
 void block_screen_create(void)

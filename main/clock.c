@@ -22,6 +22,7 @@ static char current_time_text[16] = "--:--";
 static char current_ampm_text[4] = "--";
 
 static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_event_cb_t event_cb, bool active);
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active);
 static void clock_start_sntp(void);
 static void clock_update_time_text(void);
 static void clock_timer_cb(lv_timer_t *timer);

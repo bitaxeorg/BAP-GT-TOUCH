@@ -32,6 +32,7 @@ static char last_hashrate_text[16] = "0.00";
 
 static void create_bottom_nav(void);
 static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_event_cb_t event_cb, bool active);
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active);
 static void apply_cached_hashrate(void);
 
 void night_screen_create(void)

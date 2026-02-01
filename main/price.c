@@ -38,6 +38,7 @@ static char current_price_text[32] = "--";
 static char current_price_status[24] = "LOADING...";
 
 static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_event_cb_t event_cb, bool active);
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active);
 static void apply_cached_price(void);
 static void price_task(void *arg);
 static bool price_fetch_once(void);

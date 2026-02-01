@@ -59,6 +59,7 @@ static char mempool_http_buf[MEMPOOL_HTTP_BUF_SIZE];
 static int mempool_http_len = 0;
 
 static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_event_cb_t event_cb, bool active);
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active);
 static void mempool_task(void *arg);
 static bool mempool_fetch_once(void);
 static bool mempool_ensure_netif(void);
