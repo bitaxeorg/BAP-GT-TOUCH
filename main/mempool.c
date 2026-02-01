@@ -1,4 +1,5 @@
 #include "mempool.h"
+#include "custom_fonts.h"
 #include "home.h"
 #include "block.h"
 #include "clock.h"
