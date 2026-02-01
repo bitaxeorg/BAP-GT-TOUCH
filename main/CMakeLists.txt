@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "mempool.c" "block.c" "clock.c" "price.c" "Nevan_RUS_96.c" "untyped_96.c" "montserrat_120.c" "montserrat_140.c" "fa_clock_18.c" "bap_client.c" "bap_parser.c" "bap_uart.c" "bap_protocol.c" "settings.c" "home.c" "wifi.c" "night.c"
+    SRCS "mempool.c" "block.c" "clock.c" "price.c" "Nevan_RUS_96.c" "untyped_96.c" "montserrat_120.c" "montserrat_140.c" "fa_clock_18.c" "clock-solid-full.c" "bap_client.c" "bap_parser.c" "bap_uart.c" "bap_protocol.c" "settings.c" "home.c" "wifi.c" "night.c"
         "loading.c"
         "waveshare_rgb_lcd_port.c"
         "main.c"

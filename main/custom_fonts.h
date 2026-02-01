@@ -16,4 +16,7 @@ LV_FONT_DECLARE(fa_clock_18);
 // Font Awesome icons
 #define FA_CLOCK "\xEF\x80\x97"  // Unicode 0xF017 (fa-clock)
 
+// Custom images
+LV_IMG_DECLARE(clock_solid_full);
+
 #endif // CUSTOM_FONTS_H

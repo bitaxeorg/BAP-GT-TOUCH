@@ -171,7 +171,7 @@ void mempool_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, mempool_home_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, mempool_block_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_LIST, NULL, true);
-    create_bottom_nav_btn(bottom_nav, FA_CLOCK, mempool_clock_clicked, false);
+    create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, mempool_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", mempool_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, mempool_wifi_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, mempool_settings_clicked, false);
@@ -866,6 +866,32 @@ static lv_obj_t *create_bottom_nav_btn(lv_obj_t *parent, const char *symbol, lv_
     lv_obj_set_style_text_color(label, active ? COLOR_TEXT_ON_ACCENT : COLOR_ACCENT, 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_48, 0);
     lv_obj_center(label);
+
+    if (event_cb)
+    {
+        lv_obj_add_event_cb(btn, event_cb, LV_EVENT_CLICKED, NULL);
+    }
+
+    return btn;
+}
+
+static lv_obj_t *create_bottom_nav_btn_img(lv_obj_t *parent, const lv_img_dsc_t *img_dsc, lv_event_cb_t event_cb, bool active)
+{
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_size(btn, 56, 46);
+    lv_obj_set_style_bg_color(btn, active ? COLOR_ACCENT : COLOR_CARD_BG, 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(btn, active ? 0 : 2, 0);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, 0);
+    lv_obj_set_style_border_opa(btn, active ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 10, 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+
+    lv_obj_t *img = lv_img_create(btn);
+    lv_img_set_src(img, img_dsc);
+    lv_obj_set_style_img_recolor(img, active ? COLOR_TEXT_ON_ACCENT : COLOR_ACCENT, 0);
+    lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
+    lv_obj_center(img);
 
     if (event_cb)
     {
