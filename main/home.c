@@ -136,11 +136,10 @@ static void create_hardware_popup(void)
     lv_obj_set_style_pad_all(info_cont, 10, 0);
 
     char buffer[64];
-    const char *labels[] = {"Model", "Chip", "Fan Speed"};
+    const char *labels[] = {"Model", "Chip"};
     const char *values[] = {
         current_hardware_info.model,
-        current_hardware_info.chip,
-        current_hardware_info.fan_speed};
+        current_hardware_info.chip};
 
     int y_offset = 0;
     for (int i = 0; i < 3; i++)
