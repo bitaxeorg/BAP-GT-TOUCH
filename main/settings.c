@@ -560,7 +560,7 @@ void settings_screen_create(void)
     lv_obj_set_flex_align(bottom_nav, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, settings_home_clicked, false);
-    create_bottom_nav_btn(bottom_nav, &cube_solid_full, settings_block_clicked, false);
+    create_bottom_nav_btn_img(bottom_nav, &cube_solid_full, settings_block_clicked, false);
     create_bottom_nav_btn_img(bottom_nav, &cubes_solid_full, settings_mempool_clicked, false);
     create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, settings_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", settings_price_clicked, false);
