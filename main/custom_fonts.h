@@ -16,5 +16,6 @@ LV_FONT_DECLARE(montserrat_140);
 // Custom images
 LV_IMG_DECLARE(clock_solid_full);
 LV_IMG_DECLARE(cube_solid_full);
+LV_IMG_DECLARE(cubes_solid_full);
 
 #endif // CUSTOM_FONTS_H

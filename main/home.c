@@ -142,7 +142,7 @@ static void create_hardware_popup(void)
         current_hardware_info.chip};
 
     int y_offset = 0;
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 2; i++)
     {
         lv_obj_t *info_label = lv_label_create(info_cont);
         snprintf(buffer, sizeof(buffer), "%s: %s", labels[i], values[i]);
@@ -535,7 +535,7 @@ void home_screen_create(void)
 
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_HOME, NULL, true);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_STOP, home_block_clicked, false);
-    create_bottom_nav_btn_img(bottom_nav, &cube_solid_full, home_mempool_clicked, false);
+    create_bottom_nav_btn_img(bottom_nav, &cubes_solid_full, home_mempool_clicked, false);
     create_bottom_nav_btn_img(bottom_nav, &clock_solid_full, home_clock_clicked, false);
     create_bottom_nav_btn(bottom_nav, "$", home_price_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, home_wifi_clicked, false);
