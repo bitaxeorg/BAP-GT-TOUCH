@@ -11,6 +11,7 @@
 #include "custom_fonts.h"
 #include "bap.h"
 #include "waveshare_rgb_lcd_port.h"
+#include "ota_update.h"
 #include <stdlib.h>
 #include <time.h>
 #include "nvs_flash.h"
@@ -31,6 +32,13 @@ static lv_obj_t *brightness_value_label = NULL;
 static lv_obj_t *timezone_dropdown = NULL;
 static lv_obj_t *sys_overlay = NULL;
 static int diag_counter = 0;
+
+// OTA Update UI elements
+static lv_obj_t *ota_update_btn = NULL;
+static lv_obj_t *ota_status_label = NULL;
+static lv_obj_t *ota_progress_bar = NULL;
+static lv_obj_t *ota_version_label = NULL;
+static lv_timer_t *ota_timer = NULL;
 
 static settings_info_t current_settings = {
     .performance_mode = PERFORMANCE_MEDIUM,
@@ -364,6 +372,95 @@ static void settings_diagnostics_handler(lv_event_t *e)
     }
 }
 
+// OTA Update timer callback - updates progress UI
+static void ota_update_timer_cb(lv_timer_t *timer)
+{
+    if (!ota_status_label || !ota_progress_bar || !ota_update_btn) {
+        return;
+    }
+
+    ota_info_t info;
+    ota_update_get_info(&info);
+
+    char status_text[128];
+
+    switch (info.status) {
+        case OTA_STATUS_IDLE:
+            lv_label_set_text(ota_status_label, "Ready for update");
+            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+            break;
+
+        case OTA_STATUS_CHECKING:
+            lv_label_set_text(ota_status_label, "Checking for updates...");
+            lv_obj_add_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+            break;
+
+        case OTA_STATUS_UPDATE_AVAILABLE:
+            snprintf(status_text, sizeof(status_text), "Update available: %s", info.latest_version);
+            lv_label_set_text(ota_status_label, status_text);
+            if (ota_version_label) {
+                snprintf(status_text, sizeof(status_text), "Current: %s | Latest: %s", 
+                    info.current_version, info.latest_version);
+                lv_label_set_text(ota_version_label, status_text);
+            }
+            lv_label_set_text(ota_update_btn, "INSTALL UPDATE");
+            lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+            break;
+
+        case OTA_STATUS_NO_UPDATE:
+            lv_label_set_text(ota_status_label, "Already up to date");
+            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, 100, LV_ANIM_OFF);
+            break;
+
+        case OTA_STATUS_DOWNLOADING:
+            lv_label_set_text_fmt(ota_status_label, "Downloading... %d%%", info.progress_percent);
+            lv_obj_add_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, info.progress_percent, LV_ANIM_ON);
+            break;
+
+        case OTA_STATUS_FLASHING:
+            lv_label_set_text_fmt(ota_status_label, "Installing... %d%%", info.progress_percent);
+            lv_obj_add_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, info.progress_percent, LV_ANIM_ON);
+            break;
+
+        case OTA_STATUS_SUCCESS:
+            lv_label_set_text(ota_status_label, "Update successful! Rebooting...");
+            lv_bar_set_value(ota_progress_bar, 100, LV_ANIM_ON);
+            break;
+
+        case OTA_STATUS_ERROR:
+            lv_label_set_text_fmt(ota_status_label, "Error: %s", 
+                info.error_msg[0] ? info.error_msg : "Unknown error");
+            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
+            lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+            break;
+    }
+}
+
+// OTA Update button click handler
+static void settings_ota_update_clicked(lv_event_t *e)
+{
+    ota_info_t info;
+    ota_update_get_info(&info);
+
+    if (info.status == OTA_STATUS_UPDATE_AVAILABLE) {
+        esp_err_t ret = ota_update_start_latest();
+        if (ret != ESP_OK && ota_status_label) {
+            lv_label_set_text(ota_status_label, "Failed to start update");
+        }
+    } else {
+        ota_check_for_updates();
+    }
+}
+
 void settings_screen_create(void)
 {
     if (settings_screen != NULL)
@@ -546,6 +643,51 @@ void settings_screen_create(void)
         apply_timezone_by_index(current_timezone_index);
     }
 
+    // OTA Update Section
+    lv_obj_t *ota_section = lv_obj_create(main_cont);
+    lv_obj_set_size(ota_section, 680, 160);
+    lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 490);
+    lv_obj_set_style_bg_opa(ota_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ota_section, 0, 0);
+    lv_obj_set_style_pad_all(ota_section, 10, 0);
+    lv_obj_clear_flag(ota_section, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *ota_title = lv_label_create(ota_section);
+    lv_label_set_text(ota_title, "Firmware Update:");
+    lv_obj_set_style_text_color(ota_title, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(ota_title, &lv_font_montserrat_18, 0);
+    lv_obj_align(ota_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    ota_version_label = lv_label_create(ota_section);
+    char version_text[64];
+    const char *version = ota_get_current_version();
+    snprintf(version_text, sizeof(version_text), "Current: %s", version ? version : "Unknown");
+    lv_label_set_text(ota_version_label, version_text);
+    lv_obj_set_style_text_color(ota_version_label, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(ota_version_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(ota_version_label, LV_ALIGN_TOP_LEFT, 0, 30);
+
+    ota_status_label = lv_label_create(ota_section);
+    lv_label_set_text(ota_status_label, "Ready for update");
+    lv_obj_set_style_text_color(ota_status_label, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(ota_status_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(ota_status_label, LV_ALIGN_TOP_LEFT, 0, 55);
+
+    ota_progress_bar = lv_bar_create(ota_section);
+    lv_obj_set_size(ota_progress_bar, 420, 16);
+    lv_obj_align(ota_progress_bar, LV_ALIGN_TOP_LEFT, 0, 80);
+    lv_bar_set_range(ota_progress_bar, 0, 100);
+    lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(ota_progress_bar, COLOR_CARD_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ota_progress_bar, COLOR_ACCENT, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ota_progress_bar, 8, 0);
+
+    ota_update_btn = create_settings_button(ota_section, "CHECK FOR UPDATES", settings_ota_update_clicked, false);
+    lv_obj_set_size(ota_update_btn, 240, 36);
+    lv_obj_align(ota_update_btn, LV_ALIGN_TOP_LEFT, 0, 110);
+
+    // Create OTA update timer (500ms interval)
+    ota_timer = lv_timer_create(ota_update_timer_cb, 500, NULL);
+
     lv_obj_t *bottom_nav = lv_obj_create(settings_screen);
     lv_obj_set_size(bottom_nav, SCREEN_WIDTH, 64);
     lv_obj_align(bottom_nav, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -578,6 +720,12 @@ void settings_screen_destroy(void)
     }
     diag_counter = 0;
 
+    // Clean up OTA timer
+    if (ota_timer) {
+        lv_timer_del(ota_timer);
+        ota_timer = NULL;
+    }
+
     if (settings_screen)
     {
         lv_obj_del(settings_screen);
@@ -592,6 +740,10 @@ void settings_screen_destroy(void)
         brightness_slider = NULL;
         brightness_value_label = NULL;
         timezone_dropdown = NULL;
+        ota_update_btn = NULL;
+        ota_status_label = NULL;
+        ota_progress_bar = NULL;
+        ota_version_label = NULL;
     }
 }
 

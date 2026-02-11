@@ -9,4 +9,9 @@ add_compile_options("-Wno-attributes")
 # Set custom partition table
 set(PARTITION_TABLE_CSV_PATH ${CMAKE_CURRENT_SOURCE_DIR}/partitions.csv)
 
+# Default version (overridden by CI with -DPROJECT_VER)
+if(NOT DEFINED PROJECT_VER)
+    set(PROJECT_VER "v1.0.1")
+endif()
+
 project(lvgl_porting)

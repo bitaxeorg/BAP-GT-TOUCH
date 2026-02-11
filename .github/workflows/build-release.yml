@@ -20,6 +20,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+          fetch-depth: 0
+      - name: "Extract version from tag"
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
       - name: List contents of the repository
         run: |
           echo "Listing files in the current directory: ${{ github.workspace }}"
@@ -29,22 +40,68 @@ jobs:
         with:
           esp_idf_version: v5.4.1
           target: esp32s3
-          command: GITHUB_ACTIONS="true" idf.py build
+          command: GITHUB_ACTIONS="true" idf.py -DPROJECT_VER="${{ steps.version.outputs.VERSION }}" build
           path: '.'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
       - run: pip install esptool
+      - name: "Extract version from tag"
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
       - name: "Create factory/merged image"
-        run: "./merge_bin.sh esp-display.bin"
-      - name: upload esp-display.bin
+        run: "./merge_bin.sh"
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+      - name: "Upload factory binary"
         uses: actions/upload-artifact@v4
         with:
-          name: esp-display.bin
-          path: esp-display.bin
-      - name: Release esp-display.bin
+          name: esp-display-factory-${{ steps.version.outputs.VERSION }}
+          path: esp-display-${{ steps.version.outputs.VERSION }}.bin
+      - name: "Upload OTA binary"
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp-display-ota-${{ steps.version.outputs.VERSION }}
+          path: esp-display-ota-${{ steps.version.outputs.VERSION }}.bin
+      - name: "Create generic OTA binary for 'latest' downloads"
+        run: |
+          cp esp-display-ota-${{ steps.version.outputs.VERSION }}.bin esp-display-ota.bin
+          echo "Created generic OTA binary for easy 'latest' URL access"
+      - name: "Release binaries to GitHub"
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: esp-display.bin
+          files: |
+            esp-display-${{ steps.version.outputs.VERSION }}.bin
+            esp-display-ota-${{ steps.version.outputs.VERSION }}.bin
+            esp-display-ota.bin
+          body: |
+            ## BAP-GT-TOUCH Firmware ${{ steps.version.outputs.VERSION }}
+
+            ### Installation Files:
+
+            **For initial USB flash:**
+            - `esp-display-${{ steps.version.outputs.VERSION }}.bin` - Complete factory image
+
+            **For OTA wireless updates:**
+            - `esp-display-ota-${{ steps.version.outputs.VERSION }}.bin` - OTA update image
+
+            ### Flash Instructions:
+
+            ```bash
+            # Factory image (initial flash via USB)
+            esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 esp-display-${{ steps.version.outputs.VERSION }}.bin
+            ```
+
+            ### OTA Update:
+            1. Go to Settings screen on device
+            2. Tap "CHECK FOR UPDATES"
+            3. Device will download and install automatically
