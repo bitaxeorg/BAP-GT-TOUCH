@@ -47,16 +47,6 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
       - run: pip install esptool
-      - name: "Extract version from tag"
-        id: version
-        run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
       - name: "Create factory/merged image"
         run: "./merge_bin.sh"
         env:
