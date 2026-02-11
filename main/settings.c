@@ -384,10 +384,12 @@ static void ota_update_timer_cb(lv_timer_t *timer)
 
     char status_text[128];
 
+    lv_obj_t *btn_label = lv_obj_get_child(ota_update_btn, 0);
+
     switch (info.status) {
         case OTA_STATUS_IDLE:
             lv_label_set_text(ota_status_label, "Ready for update");
-            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            if (btn_label) lv_label_set_text(btn_label, "CHECK FOR UPDATES");
             lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
             lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
             break;
@@ -406,14 +408,14 @@ static void ota_update_timer_cb(lv_timer_t *timer)
                     info.current_version, info.latest_version);
                 lv_label_set_text(ota_version_label, status_text);
             }
-            lv_label_set_text(ota_update_btn, "INSTALL UPDATE");
+            if (btn_label) lv_label_set_text(btn_label, "INSTALL UPDATE");
             lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
             lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
             break;
 
         case OTA_STATUS_NO_UPDATE:
             lv_label_set_text(ota_status_label, "Already up to date");
-            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            if (btn_label) lv_label_set_text(btn_label, "CHECK FOR UPDATES");
             lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
             lv_bar_set_value(ota_progress_bar, 100, LV_ANIM_OFF);
             break;
@@ -438,7 +440,7 @@ static void ota_update_timer_cb(lv_timer_t *timer)
         case OTA_STATUS_ERROR:
             lv_label_set_text_fmt(ota_status_label, "Error: %s", 
                 info.error_msg[0] ? info.error_msg : "Unknown error");
-            lv_label_set_text(ota_update_btn, "CHECK FOR UPDATES");
+            if (btn_label) lv_label_set_text(btn_label, "CHECK FOR UPDATES");
             lv_obj_clear_state(ota_update_btn, LV_STATE_DISABLED);
             lv_bar_set_value(ota_progress_bar, 0, LV_ANIM_OFF);
             break;
