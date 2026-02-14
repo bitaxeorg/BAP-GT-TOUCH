@@ -244,8 +244,8 @@ static void ota_task(void *param)
         .url = url,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 30000,
-        .buffer_size = 1024,
-        .buffer_size_tx = 512,
+        .buffer_size = 4096,
+        .buffer_size_tx = 1024,
         .keep_alive_enable = true,
         .max_redirection_count = 10,
     };
