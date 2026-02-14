@@ -17,6 +17,7 @@
 static const char *TAG = "OTA";
 
 #define OTA_STACK_SIZE 10240
+#define OTA_TASK_PRIORITY 3
 #define VERSION_CHECK_STACK_SIZE 8192
 #define GITHUB_API_URL "https://api.github.com/repos/bitaxeorg/BAP-GT-TOUCH/releases/latest"
 #define FIRMWARE_DOWNLOAD_URL "https://github.com/bitaxeorg/BAP-GT-TOUCH/releases/latest/download/esp-display-ota.bin"
@@ -279,6 +280,8 @@ static void ota_task(void *param)
             if ((read_len & 0xFFFF) < 4096) {
                 ESP_LOGI(TAG, "Progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
             }
+            // Yield to let LVGL and other tasks run 
+            vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
         if (err == ESP_OK) {
@@ -339,7 +342,7 @@ void ota_check_for_updates(void)
         "version_check",
         VERSION_CHECK_STACK_SIZE,
         NULL,
-        5,
+        OTA_TASK_PRIORITY,
         &version_check_task_handle
     );
 
@@ -386,7 +389,7 @@ esp_err_t ota_update_start(const char *url)
         "ota_task",
         OTA_STACK_SIZE,
         url_copy,
-        5,
+        OTA_TASK_PRIORITY,
         &ota_task_handle
     );
 
