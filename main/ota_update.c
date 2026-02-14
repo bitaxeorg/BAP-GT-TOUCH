@@ -244,8 +244,8 @@ static void ota_task(void *param)
         .url = url,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 30000,
-        .buffer_size = 8192,
-        .buffer_size_tx = 2048,
+        .buffer_size = 1024,
+        .buffer_size_tx = 512,
         .keep_alive_enable = true,
         .max_redirection_count = 10,
     };
@@ -280,8 +280,8 @@ static void ota_task(void *param)
             if ((read_len & 0xFFFF) < 4096) {
                 ESP_LOGI(TAG, "Progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
             }
-            // Yield to let LVGL and other tasks run 
-            vTaskDelay(pdMS_TO_TICKS(20));
+            // Yield to let RGB LCD DMA and LVGL catch up after flash write
+            vTaskDelay(pdMS_TO_TICKS(50));
             continue;
         }
         if (err == ESP_OK) {
