@@ -44,8 +44,7 @@ static hardware_info_t current_hardware_info = {
 static pool_info_t current_pool_info = {
     .url = "loading...",
     .port = "loading...",
-    .worker_name = "bitaxe_001",
-    .status = "Connected"};
+    .worker_name = "bitaxe_001"};
 
 static void hardware_popup_close_clicked(lv_event_t *e);
 static void pool_popup_close_clicked(lv_event_t *e);
@@ -220,15 +219,14 @@ static void create_pool_popup(void)
     lv_obj_set_style_pad_all(info_cont, 10, 0);
 
     char buffer[128];
-    const char *labels[] = {"URL", "Port", "User", "Status"};
+    const char *labels[] = {"URL", "Port", "User"};
     const char *values[] = {
         current_pool_info.url,
         current_pool_info.port,
-        current_pool_info.worker_name,
-        current_pool_info.status};
+        current_pool_info.worker_name};
 
     int y_offset = 0;
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 3; i++)
     {
         lv_obj_t *info_label = lv_label_create(info_cont);
         snprintf(buffer, sizeof(buffer), "%s: %s", labels[i], values[i]);
@@ -759,11 +757,6 @@ void home_update_pool_info(const pool_info_t *pool_info)
         {
             strncpy(current_pool_info.worker_name, pool_info->worker_name, sizeof(current_pool_info.worker_name) - 1);
             current_pool_info.worker_name[sizeof(current_pool_info.worker_name) - 1] = '\0';
-        }
-        if (strlen(pool_info->status) > 0)
-        {
-            strncpy(current_pool_info.status, pool_info->status, sizeof(current_pool_info.status) - 1);
-            current_pool_info.status[sizeof(current_pool_info.status) - 1] = '\0';
         }
 
         if (pool_popup)
