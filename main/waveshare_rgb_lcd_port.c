@@ -89,6 +89,62 @@ void waveshare_esp32_s3_touch_reset()
 
 #endif
 
+static esp_err_t init_gt911_touch_with_fallback(esp_lcd_touch_handle_t *out_tp_handle)
+{
+    esp_lcd_touch_handle_t tp_handle = NULL;
+    esp_lcd_panel_io_handle_t tp_io_handle = NULL;
+
+    // Try default GT911 address first (0x5D), then backup (0x14).
+    const uint8_t gt911_addrs[] = {
+        ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+        ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP,
+    };
+
+    for (size_t i = 0; i < sizeof(gt911_addrs) / sizeof(gt911_addrs[0]); i++) {
+        esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+        tp_io_config.dev_addr = gt911_addrs[i];
+
+        ESP_LOGI(TAG, "Initialize I2C panel IO for GT911 at 0x%02X", (unsigned int)tp_io_config.dev_addr);
+        esp_err_t ret = esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_MASTER_NUM, &tp_io_config, &tp_io_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "GT911 I2C IO init failed at 0x%02X: %s", (unsigned int)tp_io_config.dev_addr, esp_err_to_name(ret));
+            continue;
+        }
+
+        esp_lcd_touch_io_gt911_config_t gt911_cfg = {
+            .dev_addr = tp_io_config.dev_addr,
+        };
+        const esp_lcd_touch_config_t tp_cfg = {
+            .x_max = EXAMPLE_LCD_H_RES,
+            .y_max = EXAMPLE_LCD_V_RES,
+            .rst_gpio_num = EXAMPLE_PIN_NUM_TOUCH_RST,
+            .int_gpio_num = EXAMPLE_PIN_NUM_TOUCH_INT,
+            .levels = {
+                .reset = 0,
+                .interrupt = 0,
+            },
+            .flags = {
+                .swap_xy = 0,
+                .mirror_x = 0,
+                .mirror_y = 0,
+            },
+            .driver_data = &gt911_cfg,
+        };
+
+        ESP_LOGI(TAG, "Initialize touch controller GT911 at 0x%02X", (unsigned int)tp_io_config.dev_addr);
+        ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, &tp_handle);
+        if (ret == ESP_OK) {
+            *out_tp_handle = tp_handle;
+            return ESP_OK;
+        }
+
+        ESP_LOGW(TAG, "GT911 init failed at 0x%02X: %s", (unsigned int)tp_io_config.dev_addr, esp_err_to_name(ret));
+    }
+
+    *out_tp_handle = NULL;
+    return ESP_FAIL;
+}
+
 // Initialize RGB LCD
 esp_err_t waveshare_esp32_s3_rgb_lcd_init()
 {
@@ -153,35 +209,16 @@ esp_err_t waveshare_esp32_s3_rgb_lcd_init()
     esp_lcd_touch_handle_t tp_handle = NULL; // Declare a handle for the touch panel
 #if CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_GT911
     ESP_LOGI(TAG, "Initialize I2C bus"); // Log the initialization of the I2C bus
-    i2c_master_init(); // Initialize the I2C master
+    ESP_ERROR_CHECK(i2c_master_init()); // Initialize the I2C master
     ESP_LOGI(TAG, "Initialize GPIO"); // Log GPIO initialization
     gpio_init(); // Initialize GPIO pins
     ESP_LOGI(TAG, "Initialize Touch LCD"); // Log touch LCD initialization
     waveshare_esp32_s3_touch_reset(); // Reset the touch panel
 
-    esp_lcd_panel_io_handle_t tp_io_handle = NULL; // Declare a handle for touch panel I/O
-    const esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG(); // Configure I2C for GT911 touch controller
-
-    ESP_LOGI(TAG, "Initialize I2C panel IO"); // Log I2C panel I/O initialization
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_MASTER_NUM, &tp_io_config, &tp_io_handle)); // Create new I2C panel I/O
-
-    ESP_LOGI(TAG, "Initialize touch controller GT911"); // Log touch controller initialization
-    const esp_lcd_touch_config_t tp_cfg = {
-        .x_max = EXAMPLE_LCD_H_RES, // Set maximum X coordinate
-        .y_max = EXAMPLE_LCD_V_RES, // Set maximum Y coordinate
-        .rst_gpio_num = EXAMPLE_PIN_NUM_TOUCH_RST, // GPIO number for reset
-        .int_gpio_num = EXAMPLE_PIN_NUM_TOUCH_INT, // GPIO number for interrupt
-        .levels = {
-            .reset = 0, // Reset level
-            .interrupt = 0, // Interrupt level
-        },
-        .flags = {
-            .swap_xy = 0, // No swap of X and Y
-            .mirror_x = 0, // No mirroring of X
-            .mirror_y = 0, // No mirroring of Y
-        },
-    };
-    ESP_ERROR_CHECK(esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, &tp_handle)); // Create new I2C GT911 touch controller
+    esp_err_t tp_ret = init_gt911_touch_with_fallback(&tp_handle);
+    if (tp_ret != ESP_OK) {
+        ESP_LOGE(TAG, "GT911 touch init failed on all known addresses, continuing without touch");
+    }
 #endif // CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_GT911
 
     ESP_ERROR_CHECK(lvgl_port_init(panel_handle, tp_handle)); // Initialize LVGL with the panel and touch handles
