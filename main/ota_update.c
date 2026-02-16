@@ -4,7 +4,10 @@
 
 #include "ota_update.h"
 #include "ota_screen.h"
+#include "settings.h"
+#include "bap_client.h"
 #include "lvgl_port.h"
+#include "waveshare_rgb_lcd_port.h"
 #include "esp_log.h"
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
@@ -241,11 +244,23 @@ static void ota_task(void *param)
 
     ESP_LOGI(TAG, "Starting OTA update from: %s", url);
 
+    // Suspend BAP client to prevent UART updates during OTA
+    bap_client_suspend();
+
     // Show OTA screen with LVGL lock
     if (lvgl_port_lock(1000)) {
+        ESP_LOGW(TAG, "=== SHOWING OTA SCREEN ===");
         ota_screen_show();
         lvgl_port_unlock();
     }
+
+    // Small delay to ensure screen is rendered, then suspend LVGL task
+    vTaskDelay(pdMS_TO_TICKS(100));
+    lvgl_port_task_suspend();
+
+    // Turn off backlight to prevent flickering during flash writes
+    ESP_LOGI(TAG, "Turning off display backlight during flash writes");
+    lcd_backlight_disable();
 
     ota_set_status(OTA_STATUS_DOWNLOADING, 0, NULL);
 
@@ -280,7 +295,13 @@ static void ota_task(void *param)
 
     ota_set_status(OTA_STATUS_FLASHING, 0, NULL);
 
-    int last_displayed_progress = -1;
+    // Update screen once before flashing starts
+    if (lvgl_port_lock(100)) {
+        ota_screen_update_progress(1);  // Show we've started flashing
+        lvgl_port_unlock();
+    }
+
+    ESP_LOGI(TAG, "Starting flash write (BAP client suspended)");
 
     while (1) {
         err = esp_https_ota_perform(ota_handle);
@@ -293,19 +314,13 @@ static void ota_task(void *param)
             }
             ota_set_status(OTA_STATUS_FLASHING, progress, NULL);
 
-            // Only update screen every 25% to minimize LVGL rendering during flash
-            int progress_step = (progress / 25) * 25;
-            if (progress_step != last_displayed_progress || progress >= 100) {
-                if (lvgl_port_lock(100)) {
-                    ota_screen_update_progress(progress);
-                    lvgl_port_unlock();
-                }
-                last_displayed_progress = progress_step;
-                ESP_LOGI(TAG, "Progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
+            // Log progress periodically
+            if ((read_len & 0xFFFF) < 4096) {
+                ESP_LOGI(TAG, "Flash progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
             }
 
-            // Yield to let RGB LCD DMA catch up after flash write
-            vTaskDelay(pdMS_TO_TICKS(100));
+            // Small delay to allow other tasks to run
+            vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
         if (err == ESP_OK) {
@@ -337,6 +352,14 @@ static void ota_task(void *param)
     ota_set_status(OTA_STATUS_SUCCESS, 100, NULL);
     ESP_LOGI(TAG, "OTA update successful! Rebooting in 3 seconds...");
 
+    // Turn backlight back on
+    ESP_LOGI(TAG, "Turning on display backlight");
+    lcd_backlight_enable();
+
+    // Resume LVGL task to show completion message
+    lvgl_port_task_resume();
+    vTaskDelay(pdMS_TO_TICKS(50)); // Brief delay for LVGL to start
+
     // Show completion
     if (lvgl_port_lock(100)) {
         ota_screen_update_progress(100);
@@ -351,12 +374,22 @@ cleanup:
         esp_https_ota_abort(ota_handle);
     }
 
+    // Turn backlight back on
+    ESP_LOGI(TAG, "Turning on display backlight");
+    lcd_backlight_enable();
+
+    // Resume LVGL task first
+    lvgl_port_task_resume();
+
     // Show error screen for a few seconds, then hide it
     vTaskDelay(pdMS_TO_TICKS(3000));
     if (lvgl_port_lock(100)) {
         ota_screen_hide();
         lvgl_port_unlock();
     }
+
+    // Resume BAP client tasks
+    bap_client_resume();
 
     if (url) {
         free(url);

@@ -56,38 +56,33 @@ void ota_screen_show(void)
     lv_scr_load(ota_screen);
 
     last_reported_progress = 0;
-    ESP_LOGI(TAG, "OTA screen displayed");
+    ESP_LOGI(TAG, "OTA screen loaded and displayed");
 }
 
 void ota_screen_update_progress(int progress)
 {
-    if (!ota_screen || !progress_label) {
+    if (!ota_screen || !progress_label || !status_label) {
+        ESP_LOGE(TAG, "ota_screen_update_progress called but widgets are NULL");
         return;
     }
 
-    // Only update every 25% to minimize LVGL rendering during flash writes
-    int progress_step = (progress / 25) * 25;
     if (progress >= 100) {
-        progress_step = 100;
+        lv_label_set_text(status_label, "Complete! Rebooting...");
+        lv_label_set_text(progress_label, "100%");
+        ESP_LOGI(TAG, "OTA complete, rebooting...");
+    } else if (progress >= 1) {
+        // During flashing
+        lv_label_set_text(status_label, "Update in progress...");
+        lv_label_set_text(progress_label, "");
+        ESP_LOGI(TAG, "OTA flashing in progress");
+    } else {
+        // Initial state
+        lv_label_set_text(status_label, "Starting update...");
+        lv_label_set_text(progress_label, "0%");
+        ESP_LOGI(TAG, "OTA starting...");
     }
 
-    if (progress_step != last_reported_progress) {
-        ESP_LOGI(TAG, "Updating progress display: %d%%", progress_step);
-
-        // Quick update without animation
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%d%%", progress_step);
-        lv_label_set_text(progress_label, buf);
-
-        // Update status
-        if (progress_step >= 100) {
-            lv_label_set_text(status_label, "Complete! Rebooting...");
-        } else if (progress_step >= 50) {
-            lv_label_set_text(status_label, "Flashing firmware...");
-        }
-
-        last_reported_progress = progress_step;
-    }
+    last_reported_progress = progress;
 }
 
 void ota_screen_show_error(const char *error)

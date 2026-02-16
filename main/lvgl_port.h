@@ -154,6 +154,18 @@ void lvgl_port_unlock(void);
  */
 bool lvgl_port_notify_rgb_vsync(void);
 
+/**
+ * @brief Suspend LVGL task (for OTA updates)
+ * Suspends the LVGL rendering task to prevent PSRAM access during flash writes
+ */
+void lvgl_port_task_suspend(void);
+
+/**
+ * @brief Resume LVGL task (after OTA updates)
+ * Resumes the LVGL rendering task
+ */
+void lvgl_port_task_resume(void);
+
 #ifdef __cplusplus
 }
 #endif
