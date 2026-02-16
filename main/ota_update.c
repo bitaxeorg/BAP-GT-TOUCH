@@ -3,6 +3,8 @@
  */
 
 #include "ota_update.h"
+#include "ota_screen.h"
+#include "lvgl_port.h"
 #include "esp_log.h"
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
@@ -238,6 +240,13 @@ static void ota_task(void *param)
     esp_https_ota_handle_t ota_handle = NULL;
 
     ESP_LOGI(TAG, "Starting OTA update from: %s", url);
+
+    // Show OTA screen with LVGL lock
+    if (lvgl_port_lock(1000)) {
+        ota_screen_show();
+        lvgl_port_unlock();
+    }
+
     ota_set_status(OTA_STATUS_DOWNLOADING, 0, NULL);
 
     esp_http_client_config_t http_config = {
@@ -258,6 +267,11 @@ static void ota_task(void *param)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_https_ota_begin failed: %s", esp_err_to_name(err));
         ota_set_status(OTA_STATUS_ERROR, 0, "OTA begin failed");
+        if (lvgl_port_lock(100)) {
+            ota_screen_show_error("Connection failed");
+            lvgl_port_unlock();
+        }
+        vTaskDelay(pdMS_TO_TICKS(3000));
         goto cleanup;
     }
 
@@ -265,6 +279,8 @@ static void ota_task(void *param)
     ESP_LOGI(TAG, "Image size: %d bytes", image_size);
 
     ota_set_status(OTA_STATUS_FLASHING, 0, NULL);
+
+    int last_displayed_progress = -1;
 
     while (1) {
         err = esp_https_ota_perform(ota_handle);
@@ -277,10 +293,18 @@ static void ota_task(void *param)
             }
             ota_set_status(OTA_STATUS_FLASHING, progress, NULL);
 
-            if ((read_len & 0xFFFF) < 4096) {
+            // Only update screen every 25% to minimize LVGL rendering during flash
+            int progress_step = (progress / 25) * 25;
+            if (progress_step != last_displayed_progress || progress >= 100) {
+                if (lvgl_port_lock(100)) {
+                    ota_screen_update_progress(progress);
+                    lvgl_port_unlock();
+                }
+                last_displayed_progress = progress_step;
                 ESP_LOGI(TAG, "Progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
             }
-            // Yield to let RGB LCD DMA and LVGL catch up after flash write
+
+            // Yield to let RGB LCD DMA catch up after flash write
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
@@ -289,6 +313,10 @@ static void ota_task(void *param)
         }
         ESP_LOGE(TAG, "esp_https_ota_perform failed: %s", esp_err_to_name(err));
         ota_set_status(OTA_STATUS_ERROR, 0, "Download/flash failed");
+        if (lvgl_port_lock(100)) {
+            ota_screen_show_error("Download/flash failed");
+            lvgl_port_unlock();
+        }
         esp_https_ota_abort(ota_handle);
         ota_handle = NULL;
         goto cleanup;
@@ -299,11 +327,21 @@ static void ota_task(void *param)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_https_ota_finish failed: %s", esp_err_to_name(err));
         ota_set_status(OTA_STATUS_ERROR, 0, "OTA validation failed");
+        if (lvgl_port_lock(100)) {
+            ota_screen_show_error("Validation failed");
+            lvgl_port_unlock();
+        }
         goto cleanup;
     }
 
     ota_set_status(OTA_STATUS_SUCCESS, 100, NULL);
     ESP_LOGI(TAG, "OTA update successful! Rebooting in 3 seconds...");
+
+    // Show completion
+    if (lvgl_port_lock(100)) {
+        ota_screen_update_progress(100);
+        lvgl_port_unlock();
+    }
 
     vTaskDelay(pdMS_TO_TICKS(3000));
     esp_restart();
@@ -312,6 +350,14 @@ cleanup:
     if (ota_handle) {
         esp_https_ota_abort(ota_handle);
     }
+
+    // Show error screen for a few seconds, then hide it
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    if (lvgl_port_lock(100)) {
+        ota_screen_hide();
+        lvgl_port_unlock();
+    }
+
     if (url) {
         free(url);
     }
