@@ -66,32 +66,37 @@ jobs:
           cp esp-display-ota-${{ steps.version.outputs.VERSION }}.bin esp-display-ota.bin
           echo "Created generic OTA binary for easy 'latest' URL access"
       - name: "Release binaries to GitHub"
-        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            esp-display-${{ steps.version.outputs.VERSION }}.bin
-            esp-display-ota-${{ steps.version.outputs.VERSION }}.bin
-            esp-display-ota.bin
-          body: |
-            ## BAP-GT-TOUCH Firmware ${{ steps.version.outputs.VERSION }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          # Upload assets (--clobber overwrites existing files)
+          gh release upload "$VERSION" \
+            "esp-display-${VERSION}.bin" \
+            "esp-display-ota-${VERSION}.bin" \
+            "esp-display-ota.bin" \
+            --clobber
 
-            ### Installation Files:
+          # Update release body
+          gh release edit "$VERSION" --notes "## BAP-GT-TOUCH Firmware ${VERSION}
 
-            **For initial USB flash:**
-            - `esp-display-${{ steps.version.outputs.VERSION }}.bin` - Complete factory image
+          ### Installation Files:
 
-            **For OTA wireless updates:**
-            - `esp-display-ota-${{ steps.version.outputs.VERSION }}.bin` - OTA update image
+          **For initial USB flash:**
+          - \`esp-display-${VERSION}.bin\` - Complete factory image
 
-            ### Flash Instructions:
+          **For OTA wireless updates:**
+          - \`esp-display-ota-${VERSION}.bin\` - OTA update image
 
-            ```bash
-            # Factory image (initial flash via USB)
-            esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 esp-display-${{ steps.version.outputs.VERSION }}.bin
-            ```
+          ### Flash Instructions:
 
-            ### OTA Update:
-            1. Go to Settings screen on device
-            2. Tap "CHECK FOR UPDATES"
-            3. Device will download and install automatically
+          \`\`\`bash
+          # Factory image (initial flash via USB)
+          esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 esp-display-${VERSION}.bin
+          \`\`\`
+
+          ### OTA Update:
+          1. Go to Settings screen on device
+          2. Tap \"CHECK FOR UPDATES\"
+          3. Device will download and install automatically"
