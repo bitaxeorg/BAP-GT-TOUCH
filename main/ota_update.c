@@ -17,7 +17,7 @@
 static const char *TAG = "OTA";
 
 #define OTA_STACK_SIZE 10240
-#define OTA_TASK_PRIORITY 3
+#define OTA_TASK_PRIORITY 1
 #define VERSION_CHECK_STACK_SIZE 8192
 #define GITHUB_API_URL "https://api.github.com/repos/bitaxeorg/BAP-GT-TOUCH/releases/latest"
 #define FIRMWARE_DOWNLOAD_URL "https://github.com/bitaxeorg/BAP-GT-TOUCH/releases/latest/download/esp-display-ota.bin"
@@ -281,7 +281,7 @@ static void ota_task(void *param)
                 ESP_LOGI(TAG, "Progress: %d%% (%d/%d bytes)", progress, read_len, image_size);
             }
             // Yield to let RGB LCD DMA and LVGL catch up after flash write
-            vTaskDelay(pdMS_TO_TICKS(50));
+            vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
         if (err == ESP_OK) {
