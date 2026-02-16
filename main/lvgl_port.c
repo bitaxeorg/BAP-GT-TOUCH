@@ -599,3 +599,29 @@ bool lvgl_port_notify_rgb_vsync(void)
 #endif
     return (need_yield == pdTRUE); // Return whether a yield is needed
 }
+
+void lvgl_port_task_suspend(void)
+{
+    if (lvgl_task_handle != NULL) {
+        ESP_LOGW(TAG, "Suspending LVGL task to prevent PSRAM access during flash writes");
+        // Remove from watchdog before suspending
+        esp_err_t ret = esp_task_wdt_delete(lvgl_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to remove lvgl task from watchdog: %s", esp_err_to_name(ret));
+        }
+        vTaskSuspend(lvgl_task_handle);
+    }
+}
+
+void lvgl_port_task_resume(void)
+{
+    if (lvgl_task_handle != NULL) {
+        ESP_LOGW(TAG, "Resuming LVGL task");
+        vTaskResume(lvgl_task_handle);
+        // Re-add to watchdog after resuming
+        esp_err_t ret = esp_task_wdt_add(lvgl_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to re-add lvgl task to watchdog: %s", esp_err_to_name(ret));
+        }
+    }
+}

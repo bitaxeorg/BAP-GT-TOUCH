@@ -16,7 +16,6 @@ typedef struct {
     char url[128];
     char port[16];
     char worker_name[64];
-    char status[32];
 } pool_info_t;
 
 #define SCREEN_WIDTH 800

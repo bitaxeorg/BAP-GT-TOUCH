@@ -17,6 +17,7 @@
 #include "freertos/task.h"
 #include <stdlib.h>
 #include <string.h>
+#include "ota_update.h"
 
 #define PRICE_HTTP_BUF_SIZE 512
 #define PRICE_FETCH_INTERVAL_MS 60000
@@ -384,6 +385,12 @@ static void price_task(void *arg)
     (void)arg;
     while (1)
     {
+        if (ota_update_is_running())
+        {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
+        }
+
         if (!price_wifi_connected())
         {
             if (lvgl_port_lock(50))

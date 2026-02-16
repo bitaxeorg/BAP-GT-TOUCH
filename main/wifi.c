@@ -208,16 +208,18 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         current_wifi_info.is_connected = true;
-        snprintf(current_wifi_info.ip_address, sizeof(current_wifi_info.ip_address), IPSTR, IP2STR(&event->ip_info.ip));
+        // Don't update IP address here - use BAP-provided IP instead
+        // snprintf(current_wifi_info.ip_address, sizeof(current_wifi_info.ip_address), IPSTR, IP2STR(&event->ip_info.ip));
         if (status_label) {
             lv_label_set_text(status_label, "Connected");
             lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
         }
-        if (ip_label) {
-            char ip_text[32];
-            snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
-            lv_label_set_text(ip_label, ip_text);
-        }
+        // Don't update IP label here - will be updated via BAP protocol
+        // if (ip_label) {
+        //     char ip_text[32];
+        //     snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
+        //     lv_label_set_text(ip_label, ip_text);
+        // }
         return;
     }
 }

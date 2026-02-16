@@ -32,6 +32,10 @@ static bool subscribed_block_height = false;
 static bool subscribed_wifi_password = false;
 static uint32_t last_response_time = 0;
 
+// Task handles for suspend/resume
+static TaskHandle_t uart_receive_task_handle = NULL;
+static TaskHandle_t connection_monitor_task_handle = NULL;
+
 static void uart_send_task(void *pvParameters);
 static void uart_receive_task(void *pvParameters);
 static void connection_monitor_task(void *pvParameters);
@@ -51,20 +55,20 @@ esp_err_t bap_client_init(void) {
     }
     
     ESP_LOGI(TAG, "Creating UART tasks...");
-    
+
     BaseType_t task_ret = xTaskCreate(uart_send_task, "uart_send", 4096, NULL, 5, NULL);
     if (task_ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UART send task");
         return ESP_FAIL;
     }
-    
-    task_ret = xTaskCreate(uart_receive_task, "uart_receive", 4096, NULL, 5, NULL);
+
+    task_ret = xTaskCreate(uart_receive_task, "uart_receive", 4096, NULL, 5, &uart_receive_task_handle);
     if (task_ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UART receive task");
         return ESP_FAIL;
     }
-    
-    task_ret = xTaskCreate(connection_monitor_task, "connection_monitor", 3072, NULL, 3, NULL);
+
+    task_ret = xTaskCreate(connection_monitor_task, "connection_monitor", 3072, NULL, 3, &connection_monitor_task_handle);
     if (task_ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create connection monitor task");
         return ESP_FAIL;
@@ -519,4 +523,72 @@ static void connection_monitor_task(void *pvParameters) {
             }
         }
     }
+}
+
+void bap_client_suspend(void) {
+    ESP_LOGW(TAG, "╔═══════════════════════════════════════╗");
+    ESP_LOGW(TAG, "║  SUSPENDING BAP CLIENT TASKS         ║");
+    ESP_LOGW(TAG, "╚═══════════════════════════════════════╝");
+
+    if (uart_receive_task_handle != NULL) {
+        // Remove from watchdog before suspending
+        esp_err_t ret = esp_task_wdt_delete(uart_receive_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to remove uart_receive from watchdog: %s", esp_err_to_name(ret));
+        }
+        vTaskSuspend(uart_receive_task_handle);
+        ESP_LOGW(TAG, "✓ UART receive task suspended");
+    } else {
+        ESP_LOGW(TAG, "✗ UART receive task handle is NULL");
+    }
+
+    if (connection_monitor_task_handle != NULL) {
+        // Remove from watchdog before suspending
+        esp_err_t ret = esp_task_wdt_delete(connection_monitor_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to remove connection_monitor from watchdog: %s", esp_err_to_name(ret));
+        }
+        vTaskSuspend(connection_monitor_task_handle);
+        ESP_LOGW(TAG, "✓ Connection monitor task suspended");
+    } else {
+        ESP_LOGW(TAG, "✗ Connection monitor task handle is NULL");
+    }
+
+    ESP_LOGW(TAG, "═══════════════════════════════════════");
+    ESP_LOGW(TAG, "BAP tasks suspended - no more updates");
+    ESP_LOGW(TAG, "═══════════════════════════════════════");
+}
+
+void bap_client_resume(void) {
+    ESP_LOGW(TAG, "╔═══════════════════════════════════════╗");
+    ESP_LOGW(TAG, "║  RESUMING BAP CLIENT TASKS           ║");
+    ESP_LOGW(TAG, "╚═══════════════════════════════════════╝");
+
+    if (uart_receive_task_handle != NULL) {
+        vTaskResume(uart_receive_task_handle);
+        // Re-add to watchdog after resuming
+        esp_err_t ret = esp_task_wdt_add(uart_receive_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to re-add uart_receive to watchdog: %s", esp_err_to_name(ret));
+        }
+        ESP_LOGW(TAG, "✓ UART receive task resumed");
+    } else {
+        ESP_LOGW(TAG, "✗ UART receive task handle is NULL");
+    }
+
+    if (connection_monitor_task_handle != NULL) {
+        vTaskResume(connection_monitor_task_handle);
+        // Re-add to watchdog after resuming
+        esp_err_t ret = esp_task_wdt_add(connection_monitor_task_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to re-add connection_monitor to watchdog: %s", esp_err_to_name(ret));
+        }
+        ESP_LOGW(TAG, "✓ Connection monitor task resumed");
+    } else {
+        ESP_LOGW(TAG, "✗ Connection monitor task handle is NULL");
+    }
+
+    ESP_LOGW(TAG, "═══════════════════════════════════════");
+    ESP_LOGW(TAG, "BAP tasks resumed - updates restarted");
+    ESP_LOGW(TAG, "═══════════════════════════════════════");
 }

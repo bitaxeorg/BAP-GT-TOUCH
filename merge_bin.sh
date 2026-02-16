@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ESP32-S3 Display Project Binary Merger
-# Creates a single esp-display.bin file for flashing
+# Creates versioned binary files for flashing and OTA
 
 # Binary file paths and addresses
 BOOTLOADER_BIN="build/bootloader/bootloader.bin"
@@ -11,8 +11,22 @@ PARTITION_TABLE_ADDR=0x8000
 APP_BIN="build/lvgl_porting.bin"
 APP_ADDR=0x10000
 
-# Default output filename
-DEFAULT_OUTPUT="esp-display.bin"
+# Get version from environment or git tag/describe
+if [ -n "$VERSION" ]; then
+    # Use VERSION from environment (set by CI)
+    true
+elif git describe --tags --exact-match 2>/dev/null; then
+    # Exact tag exists (e.g., v1.0.1)
+    VERSION=$(git describe --tags --exact-match)
+else
+    # Use git describe (e.g., v1.0.1-3-g1234abc)
+    VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
+fi
+
+echo "Building version: $VERSION"
+
+# Default output filename (with version)
+DEFAULT_OUTPUT="esp-display-${VERSION}.bin"
 
 function show_help() {
     echo "ESP32-S3 Display Binary Merger"
@@ -114,17 +128,34 @@ esptool.py --chip esp32s3 merge_bin \
 
 # Check if the merge was successful
 if [ $? -eq 0 ]; then
-    echo "✅ Successfully created $OUTPUT_FILE"
-    
-    # Show file size
+    echo "✅ Successfully created $OUTPUT_FILE (factory image)"
+
+    # Show factory file size
     if [ -f "$OUTPUT_FILE" ]; then
         SIZE=$(ls -lh "$OUTPUT_FILE" | awk '{print $5}')
-        echo "📁 File size: $SIZE"
+        echo "📁 Factory image size: $SIZE"
     fi
-    
+
+    OTA_FILE="esp-display-ota-${VERSION}.bin"
+    if [ -f "$APP_BIN" ]; then
+        cp "$APP_BIN" "$OTA_FILE"
+        OTA_SIZE=$(ls -lh "$OTA_FILE" | awk '{print $5}')
+        echo "📁 OTA image size: $OTA_SIZE"
+        echo "✅ Successfully created $OTA_FILE (for OTA updates)"
+    fi
+
     echo ""
-    echo "To flash the complete firmware:"
-    echo "  esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 $OUTPUT_FILE"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📦 Build complete for version: $VERSION"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Factory image (initial USB flash):"
+    echo "  File: $OUTPUT_FILE"
+    echo "  Flash: esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0x0 $OUTPUT_FILE"
+    echo ""
+    echo "OTA image (for GitHub releases):"
+    echo "  File: $OTA_FILE"
+    echo "  Upload to GitHub releases for wireless updates"
     echo ""
 else
     print_error "Failed to create $OUTPUT_FILE"

@@ -88,6 +88,18 @@ bool bap_client_is_connected(void);
  */
 void bap_client_reset_connection_state(void);
 
+/**
+ * @brief Suspend BAP client tasks (for OTA updates)
+ * Suspends UART receive and connection monitor tasks to prevent display updates
+ */
+void bap_client_suspend(void);
+
+/**
+ * @brief Resume BAP client tasks (after OTA updates)
+ * Resumes UART receive and connection monitor tasks
+ */
+void bap_client_resume(void);
+
 #ifdef __cplusplus
 }
 #endif

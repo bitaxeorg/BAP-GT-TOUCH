@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "ota_update.h"
 
 #define MEMPOOL_HTTP_BUF_SIZE 65536
 #define MEMPOOL_MAX_BLOCKS 8
@@ -207,6 +208,12 @@ static void mempool_task(void *arg)
     (void)arg;
     while (1)
     {
+        if (ota_update_is_running())
+        {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
+        }
+
         if (!mempool_wifi_connected())
         {
             if (lvgl_port_lock(50))
