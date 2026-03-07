@@ -14,6 +14,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -37,12 +38,23 @@ static lv_obj_t * ssid_dropdown = NULL;
 static lv_obj_t * password_ta = NULL;
 static lv_obj_t * keyboard = NULL;
 static lv_obj_t * password_toggle_btn = NULL;
+static lv_obj_t * connection_spinner = NULL;
 static bool wifi_initialized = false;
 static bool wifi_event_handlers_registered = false;
 static bool wifi_connect_pending = false;
 static esp_netif_t *wifi_sta_netif = NULL;
 static bool wifi_bap_ssid_received = false;
 static bool wifi_bap_password_received = false;
+
+typedef enum {
+    WIFI_CONNECTION_STATE_DISCONNECTED = 0,
+    WIFI_CONNECTION_STATE_CONNECTING,
+    WIFI_CONNECTION_STATE_CONNECTED,
+    WIFI_CONNECTION_STATE_FAILED,
+} wifi_connection_state_t;
+
+static wifi_connection_state_t wifi_connection_state = WIFI_CONNECTION_STATE_DISCONNECTED;
+static int64_t wifi_connect_deadline_us = 0;
 
 static wifi_info_t current_wifi_info = {
     .ssid = "MyNetwork",
@@ -57,6 +69,99 @@ static wifi_info_t current_wifi_info = {
 static void wifi_try_connect_from_bap(void);
 static esp_err_t wifi_init_common(void);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+static void wifi_refresh_status_ui(void);
+static void wifi_set_connection_state(wifi_connection_state_t state);
+
+static void wifi_refresh_status_ui(void)
+{
+    if (status_label) {
+        switch (wifi_connection_state) {
+            case WIFI_CONNECTION_STATE_CONNECTED:
+                lv_label_set_text(status_label, "Connected");
+                lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
+                break;
+            case WIFI_CONNECTION_STATE_FAILED:
+                lv_label_set_text(status_label, "Connection failed");
+                lv_obj_set_style_text_color(status_label, COLOR_RED, 0);
+                break;
+            case WIFI_CONNECTION_STATE_CONNECTING:
+                lv_label_set_text(status_label, "Connecting...");
+                lv_obj_set_style_text_color(status_label, COLOR_ACCENT, 0);
+                break;
+            case WIFI_CONNECTION_STATE_DISCONNECTED:
+            default:
+                lv_label_set_text(status_label, "Disconnected");
+                lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
+                break;
+        }
+    }
+
+    if (signal_label) {
+        char signal_text[48];
+
+        if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTING) {
+            snprintf(signal_text, sizeof(signal_text), "This can take up to 20 seconds");
+            lv_obj_set_style_text_color(signal_label, COLOR_ACCENT, 0);
+        } else if (wifi_connection_state == WIFI_CONNECTION_STATE_FAILED) {
+            snprintf(signal_text, sizeof(signal_text), "Check password and try again");
+            lv_obj_set_style_text_color(signal_label, COLOR_RED, 0);
+        } else if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTED &&
+                   current_wifi_info.signal_strength > -128) {
+            snprintf(signal_text, sizeof(signal_text), "Signal: %d dBm", current_wifi_info.signal_strength);
+            lv_obj_set_style_text_color(signal_label, COLOR_TEXT_PRIMARY, 0);
+        } else {
+            snprintf(signal_text, sizeof(signal_text), "Signal: --");
+            lv_obj_set_style_text_color(signal_label, COLOR_TEXT_PRIMARY, 0);
+        }
+
+        lv_label_set_text(signal_label, signal_text);
+    }
+
+    if (ip_label) {
+        char ip_text[40];
+
+        if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTING) {
+            snprintf(ip_text, sizeof(ip_text), "IP: Negotiating...");
+        } else if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTED &&
+                   current_wifi_info.ip_address[0] != '\0') {
+            snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
+        } else if (wifi_connection_state == WIFI_CONNECTION_STATE_FAILED) {
+            snprintf(ip_text, sizeof(ip_text), "IP: Check password");
+        } else {
+            snprintf(ip_text, sizeof(ip_text), "IP: --");
+        }
+
+        lv_label_set_text(ip_label, ip_text);
+    }
+
+    if (connection_spinner) {
+        if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTING) {
+            lv_obj_clear_flag(connection_spinner, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(connection_spinner, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+static void wifi_set_connection_state(wifi_connection_state_t state)
+{
+    wifi_connection_state = state;
+
+    if (state == WIFI_CONNECTION_STATE_CONNECTED) {
+        current_wifi_info.is_connected = true;
+        wifi_connect_pending = false;
+        wifi_connect_deadline_us = 0;
+    } else if (state == WIFI_CONNECTION_STATE_CONNECTING) {
+        wifi_connect_deadline_us = esp_timer_get_time() + 30LL * 1000 * 1000;
+    } else {
+        current_wifi_info.is_connected = false;
+        if (state != WIFI_CONNECTION_STATE_FAILED) {
+            wifi_connect_deadline_us = 0;
+        }
+    }
+
+    wifi_refresh_status_ui();
+}
 
 static lv_obj_t* create_wifi_button(lv_obj_t* parent, const char* text, lv_event_cb_t event_cb)
 {
@@ -194,26 +299,23 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        current_wifi_info.is_connected = false;
-        if (status_label) {
-            lv_label_set_text(status_label, "Disconnected");
-            lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
-        }
         if (wifi_connect_pending) {
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
             esp_wifi_connect();
+        } else if (wifi_connection_state != WIFI_CONNECTION_STATE_FAILED) {
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_DISCONNECTED);
+        } else {
+            wifi_refresh_status_ui();
         }
         return;
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        current_wifi_info.is_connected = true;
         // Don't update IP address here - use BAP-provided IP instead
         // snprintf(current_wifi_info.ip_address, sizeof(current_wifi_info.ip_address), IPSTR, IP2STR(&event->ip_info.ip));
-        if (status_label) {
-            lv_label_set_text(status_label, "Connected");
-            lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
-        }
+        LV_UNUSED(event);
+        wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
         // Don't update IP label here - will be updated via BAP protocol
         // if (ip_label) {
         //     char ip_text[32];
@@ -478,18 +580,25 @@ void wifi_screen_create(void)
     lv_obj_align(ssid_label, LV_ALIGN_TOP_LEFT, 40, 0);
     
     status_label = lv_label_create(current_wifi_cont);
-    lv_label_set_text(status_label, current_wifi_info.is_connected ? "Connected" : "Disconnected");
+    lv_label_set_text(status_label, "");
     lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
     lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
     lv_obj_align(status_label, LV_ALIGN_TOP_LEFT, 40, 25);
-    
+
     signal_label = lv_label_create(current_wifi_cont);
-    char signal_text[32];
-    snprintf(signal_text, sizeof(signal_text), "Signal: %d dBm", current_wifi_info.signal_strength);
-    lv_label_set_text(signal_label, signal_text);
+    lv_label_set_text(signal_label, "");
     lv_obj_set_style_text_color(signal_label, COLOR_TEXT_PRIMARY, 0);
     lv_obj_set_style_text_font(signal_label, &lv_font_montserrat_12, 0);
     lv_obj_align(signal_label, LV_ALIGN_TOP_LEFT, 40, 45);
+
+    connection_spinner = lv_spinner_create(current_wifi_cont, 1000, 60);
+    lv_obj_set_size(connection_spinner, 20, 20);
+    lv_obj_align(connection_spinner, LV_ALIGN_TOP_RIGHT, 0, 22);
+    lv_obj_set_style_arc_color(connection_spinner, COLOR_BORDER, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(connection_spinner, 3, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(connection_spinner, COLOR_ACCENT, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(connection_spinner, 3, LV_PART_INDICATOR);
+    lv_obj_add_flag(connection_spinner, LV_OBJ_FLAG_HIDDEN);
     
     // IP Address info (right side)
     lv_obj_t * ip_cont = lv_obj_create(status_cont);
@@ -506,9 +615,7 @@ void wifi_screen_create(void)
     lv_obj_align(ip_icon, LV_ALIGN_TOP_LEFT, 0, 0);
     
     ip_label = lv_label_create(ip_cont);
-    char ip_text[32];
-    snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
-    lv_label_set_text(ip_label, ip_text);
+    lv_label_set_text(ip_label, "");
     lv_obj_set_style_text_color(ip_label, COLOR_TEXT_PRIMARY, 0);
     lv_obj_set_style_text_font(ip_label, &lv_font_montserrat_14, 0);
     lv_obj_align(ip_label, LV_ALIGN_TOP_LEFT, 30, 0);
@@ -610,6 +717,15 @@ void wifi_screen_create(void)
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_WIFI, NULL, true);  // WiFi is active
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_SETTINGS, wifi_settings_clicked, false);
     create_bottom_nav_btn(bottom_nav, LV_SYMBOL_EYE_OPEN, wifi_night_clicked, false);
+
+    if (wifi_connect_pending) {
+        wifi_connection_state = WIFI_CONNECTION_STATE_CONNECTING;
+    } else if (current_wifi_info.is_connected) {
+        wifi_connection_state = WIFI_CONNECTION_STATE_CONNECTED;
+    } else {
+        wifi_connection_state = WIFI_CONNECTION_STATE_DISCONNECTED;
+    }
+    wifi_refresh_status_ui();
 }
 
 void wifi_screen_destroy(void)
@@ -635,6 +751,7 @@ void wifi_screen_destroy(void)
         password_ta = NULL;
         password_toggle_btn = NULL;
         keyboard = NULL;
+        connection_spinner = NULL;
     }
 }
 
@@ -642,28 +759,19 @@ void wifi_update_info(const wifi_info_t* info)
 {
     if(info) {
         memcpy(&current_wifi_info, info, sizeof(wifi_info_t));
+        if (wifi_connect_pending) {
+            wifi_connection_state = WIFI_CONNECTION_STATE_CONNECTING;
+        } else {
+            wifi_connection_state = current_wifi_info.is_connected ?
+                WIFI_CONNECTION_STATE_CONNECTED :
+                WIFI_CONNECTION_STATE_DISCONNECTED;
+        }
         
         // Update display elements if they exist
         if(ssid_label) {
             lv_label_set_text(ssid_label, current_wifi_info.ssid);
         }
-        
-        if(status_label) {
-            lv_label_set_text(status_label, current_wifi_info.is_connected ? "Connected" : "Disconnected");
-            lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
-        }
-        
-        if(ip_label) {
-            char ip_text[32];
-            snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
-            lv_label_set_text(ip_label, ip_text);
-        }
-        
-        if(signal_label) {
-            char signal_text[32];
-            snprintf(signal_text, sizeof(signal_text), "Signal: %d dBm", current_wifi_info.signal_strength);
-            lv_label_set_text(signal_label, signal_text);
-        }
+        wifi_refresh_status_ui();
     }
 }
 
@@ -687,20 +795,13 @@ void wifi_update_rssi(const char* rssi)
     if(rssi) {
         current_wifi_info.signal_strength = atoi(rssi);
 
-        if(current_wifi_info.signal_strength > -128 && status_label) {
-            current_wifi_info.is_connected = true; // Assume connected if we have a valid RSSI
-            lv_label_set_text(status_label, "Connected");
-            lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
-        } else {
-            current_wifi_info.is_connected = false; // Invalid RSSI indicates not connected
+        if (current_wifi_info.signal_strength > -128) {
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
+        } else if (!wifi_connect_pending) {
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_DISCONNECTED);
         }
-        
-        // Update display elements if they exist
-        if(signal_label) {
-            char signal_text[32];
-            snprintf(signal_text, sizeof(signal_text), "Signal: %d dBm", current_wifi_info.signal_strength);
-            lv_label_set_text(signal_label, signal_text);
-        }
+
+        wifi_refresh_status_ui();
     }
 }
 
@@ -709,13 +810,13 @@ void wifi_update_ip(const char* ip)
     if(ip) {
         strncpy(current_wifi_info.ip_address, ip, sizeof(current_wifi_info.ip_address) - 1);
         current_wifi_info.ip_address[sizeof(current_wifi_info.ip_address) - 1] = '\0';
-        
-        // Update display elements if they exist
-        if(ip_label) {
-            char ip_text[32];
-            snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
-            lv_label_set_text(ip_label, ip_text);
+
+        if (current_wifi_info.ip_address[0] != '\0' &&
+            strcmp(current_wifi_info.ip_address, "0.0.0.0") != 0) {
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
         }
+
+        wifi_refresh_status_ui();
     }
 }
 
@@ -769,6 +870,15 @@ lv_obj_t* wifi_get_screen(void)
 void wifi_task_handler(void)
 {
     wifi_check_scan_completion();
+
+    if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTING &&
+        wifi_connect_deadline_us > 0 &&
+        esp_timer_get_time() >= wifi_connect_deadline_us) {
+        wifi_connect_pending = false;
+        wifi_connect_deadline_us = 0;
+        esp_wifi_disconnect();
+        wifi_set_connection_state(WIFI_CONNECTION_STATE_FAILED);
+    }
 }
 
 // Function to update the SSID dropdown with scan results
@@ -809,14 +919,17 @@ void wifi_connect_clicked(lv_event_t * e)
             printf("Please select a valid network first\n");
             return;
         }
-        
-        // Update current info
-        //strncpy(current_wifi_info.ssid, selected_ssid, sizeof(current_wifi_info.ssid) - 1);
-        //current_wifi_info.ssid[sizeof(current_wifi_info.ssid) - 1] = '\0';
-        //
-        //strncpy(current_wifi_info.password, password, sizeof(current_wifi_info.password) - 1);
-        //current_wifi_info.password[sizeof(current_wifi_info.password) - 1] = '\0';
-        
+
+        strncpy(current_wifi_info.ssid, selected_ssid, sizeof(current_wifi_info.ssid) - 1);
+        current_wifi_info.ssid[sizeof(current_wifi_info.ssid) - 1] = '\0';
+        current_wifi_info.ip_address[0] = '\0';
+        wifi_bap_ssid_received = false;
+        wifi_bap_password_received = false;
+        wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
+        if (ssid_label) {
+            lv_label_set_text(ssid_label, current_wifi_info.ssid);
+        }
+
         BAP_send_ssid(selected_ssid);
         BAP_send_password(password);
     }
@@ -851,11 +964,7 @@ static void wifi_try_connect_from_bap(void)
 
     wifi_connect_pending = true;
     esp_wifi_connect();
-
-    if (status_label) {
-        lv_label_set_text(status_label, "Connecting...");
-        lv_obj_set_style_text_color(status_label, COLOR_TEXT_PRIMARY, 0);
-    }
+    wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
 }
 
 void wifi_scan_clicked(lv_event_t * e)
