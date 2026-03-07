@@ -861,6 +861,11 @@ bool wifi_is_connected(void)
     return false;
 }
 
+const char *wifi_get_current_ip(void)
+{
+    return current_wifi_info.ip_address;
+}
+
 lv_obj_t* wifi_get_screen(void)
 {
     return wifi_screen;
