@@ -29,6 +29,7 @@ void wifi_update_rssi(const char* rssi);
 void wifi_update_ip(const char* ip);
 void wifi_update_password(const char* password);
 bool wifi_is_connected(void);
+const char *wifi_get_current_ip(void);
 
 // Event handlers
 void wifi_connect_clicked(lv_event_t * e);

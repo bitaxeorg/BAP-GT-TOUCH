@@ -11,6 +11,7 @@
 #include "custom_fonts.h"
 #include "esp_timer.h"
 #include "esp_random.h"
+#include "lvgl__lvgl/src/extra/libs/qrcode/lv_qrcode.h"
 #include "assets/temperature_icon.h"
 #include "assets/fan.h"
 #include "assets/star.h"
@@ -92,6 +93,8 @@ static void create_hardware_popup(void)
     lv_obj_set_style_bg_opa(hardware_popup, LV_OPA_70, 0);
     lv_obj_set_style_border_width(hardware_popup, 0, 0);
     lv_obj_set_style_pad_all(hardware_popup, 0, 0);
+    lv_obj_clear_flag(hardware_popup, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(hardware_popup, hardware_popup_close_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *popup_cont = lv_obj_create(hardware_popup);
     lv_obj_set_size(popup_cont, 500, 350);
@@ -103,6 +106,7 @@ static void create_hardware_popup(void)
     lv_obj_set_style_border_opa(popup_cont, LV_OPA_70, 0);
     lv_obj_set_style_radius(popup_cont, 12, 0);
     lv_obj_set_style_pad_all(popup_cont, 24, 0);
+    lv_obj_add_flag(popup_cont, LV_OBJ_FLAG_CLICKABLE);
 
     lv_obj_t *title = lv_label_create(popup_cont);
     lv_label_set_text(title, "Hardware Information");
@@ -176,9 +180,11 @@ static void create_pool_popup(void)
     lv_obj_set_style_bg_opa(pool_popup, LV_OPA_70, 0);
     lv_obj_set_style_border_width(pool_popup, 0, 0);
     lv_obj_set_style_pad_all(pool_popup, 0, 0);
+    lv_obj_clear_flag(pool_popup, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(pool_popup, pool_popup_close_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *popup_cont = lv_obj_create(pool_popup);
-    lv_obj_set_size(popup_cont, 500, 300);
+    lv_obj_set_size(popup_cont, 680, 360);
     lv_obj_center(popup_cont);
     lv_obj_set_style_bg_color(popup_cont, COLOR_CARD_BG, 0);
     lv_obj_set_style_bg_opa(popup_cont, LV_OPA_COVER, 0);
@@ -187,9 +193,10 @@ static void create_pool_popup(void)
     lv_obj_set_style_border_opa(popup_cont, LV_OPA_70, 0);
     lv_obj_set_style_radius(popup_cont, 12, 0);
     lv_obj_set_style_pad_all(popup_cont, 24, 0);
+    lv_obj_add_flag(popup_cont, LV_OBJ_FLAG_CLICKABLE);
 
     lv_obj_t *title = lv_label_create(popup_cont);
-    lv_label_set_text(title, "Pool Information");
+    lv_label_set_text(title, "Pool Information & Web Access");
     lv_obj_set_style_text_color(title, COLOR_TEXT_PRIMARY, 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 0);
@@ -212,8 +219,8 @@ static void create_pool_popup(void)
     lv_obj_add_event_cb(close_btn, pool_popup_close_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *info_cont = lv_obj_create(popup_cont);
-    lv_obj_set_size(info_cont, 460, 200);
-    lv_obj_align(info_cont, LV_ALIGN_CENTER, 0, 15);
+    lv_obj_set_size(info_cont, 300, 250);
+    lv_obj_align(info_cont, LV_ALIGN_LEFT_MID, 18, 22);
     lv_obj_set_style_bg_opa(info_cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(info_cont, 0, 0);
     lv_obj_set_style_pad_all(info_cont, 10, 0);
@@ -235,6 +242,77 @@ static void create_pool_popup(void)
         lv_obj_set_style_text_font(info_label, &lv_font_montserrat_16, 0);
         lv_obj_set_pos(info_label, 0, y_offset);
         y_offset += 35;
+    }
+
+    lv_obj_t *qr_cont = lv_obj_create(popup_cont);
+    lv_obj_set_size(qr_cont, 280, 250);
+    lv_obj_align(qr_cont, LV_ALIGN_RIGHT_MID, -18, 22);
+    lv_obj_set_style_bg_opa(qr_cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(qr_cont, 0, 0);
+    lv_obj_set_style_pad_all(qr_cont, 0, 0);
+    lv_obj_clear_flag(qr_cont, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *qr_title = lv_label_create(qr_cont);
+    lv_label_set_text(qr_title, "Scan to open AxeOS");
+    lv_obj_set_style_text_color(qr_title, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(qr_title, &lv_font_montserrat_16, 0);
+    lv_obj_align(qr_title, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *qr_hint = lv_label_create(qr_cont);
+    lv_label_set_text(qr_hint, "Edit pool information and BTC address.");
+    lv_label_set_long_mode(qr_hint, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(qr_hint, 250);
+    lv_obj_set_style_text_align(qr_hint, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(qr_hint, COLOR_TEXT_SECONDARY, 0);
+    lv_obj_set_style_text_font(qr_hint, &lv_font_montserrat_12, 0);
+    lv_obj_align(qr_hint, LV_ALIGN_TOP_MID, 0, 28);
+
+    const char *ip = wifi_get_current_ip();
+    bool ip_available = ip && ip[0] != '\0' && strcmp(ip, "0.0.0.0") != 0;
+
+    if (ip_available) {
+        char qr_url[96];
+        snprintf(qr_url, sizeof(qr_url), "http://%s/#/pool", ip);
+
+        lv_obj_t *qr = lv_qrcode_create(qr_cont, 150, COLOR_BACKGROUND, COLOR_TEXT_PRIMARY);
+        lv_qrcode_update(qr, qr_url, strlen(qr_url));
+        lv_obj_align(qr, LV_ALIGN_TOP_MID, 0, 64);
+        lv_obj_set_style_border_color(qr, COLOR_TEXT_PRIMARY, 0);
+        lv_obj_set_style_border_width(qr, 6, 0);
+
+        lv_obj_t *url_label = lv_label_create(qr_cont);
+        lv_label_set_text(url_label, ip);
+        lv_label_set_long_mode(url_label, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(url_label, 250);
+        lv_obj_set_style_text_align(url_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_style_text_color(url_label, lv_color_hex(0x39FF14), 0);
+        lv_obj_set_style_text_font(url_label, &lv_font_montserrat_20, 0);
+        lv_obj_align(url_label, LV_ALIGN_BOTTOM_MID, 0, 0);
+    } else {
+        lv_obj_t *qr_empty = lv_obj_create(qr_cont);
+        lv_obj_set_size(qr_empty, 150, 150);
+        lv_obj_align(qr_empty, LV_ALIGN_TOP_MID, 0, 64);
+        lv_obj_set_style_bg_color(qr_empty, COLOR_BORDER, 0);
+        lv_obj_set_style_bg_opa(qr_empty, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(qr_empty, 2, 0);
+        lv_obj_set_style_border_color(qr_empty, COLOR_ACCENT, 0);
+        lv_obj_set_style_radius(qr_empty, 12, 0);
+        lv_obj_clear_flag(qr_empty, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *empty_label = lv_label_create(qr_empty);
+        lv_label_set_text(empty_label, "No IP Yet");
+        lv_obj_set_style_text_color(empty_label, COLOR_TEXT_PRIMARY, 0);
+        lv_obj_set_style_text_font(empty_label, &lv_font_montserrat_16, 0);
+        lv_obj_center(empty_label);
+
+        lv_obj_t *url_label = lv_label_create(qr_cont);
+        lv_label_set_text(url_label, "Connect Wi-Fi first to generate the setup QR");
+        lv_label_set_long_mode(url_label, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(url_label, 250);
+        lv_obj_set_style_text_align(url_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_style_text_color(url_label, COLOR_TEXT_SECONDARY, 0);
+        lv_obj_set_style_text_font(url_label, &lv_font_montserrat_12, 0);
+        lv_obj_align(url_label, LV_ALIGN_BOTTOM_MID, 0, -8);
     }
 }
 
