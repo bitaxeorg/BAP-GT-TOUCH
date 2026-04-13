@@ -1,16 +1,16 @@
 # Bitaxe GT Touch - 4.3" LCD Display with Touch Interface
 
 [![ESP32-S3](https://img.shields.io/badge/ESP32-S3-blue)](https://espressif.com/products/socs/esp32-s3)
-[![ST7701](https://img.shields.io/badge/LCD-ST7701-green)](https://www.sitronix.com.tw/en/product/Driver-IC/Display-Driver-IC/Mobile-Display-Driver-IC/ST7701S)
+[![ST7262](https://img.shields.io/badge/LCD-ST7262-green)](https://ifan-display.com/product/5-inch-touch-screen-st7262-driver-ctp-gt911-800x480/)
 [![GT911](https://img.shields.io/badge/Touch-GT911-orange)](https://goodix.com/)
 [![LVGL](https://img.shields.io/badge/GUI-LVGL-purple)](https://lvgl.io/)
 [![ESP-IDF](https://img.shields.io/badge/Framework-ESP--IDF_5.4.1-red)](https://docs.espressif.com/projects/esp-idf/en/latest/)
 
-A sophisticated touchscreen display addon for Bitaxe miners, featuring a 4.3-inch ST7701 RGB LCD with GT911 capacitive touch controller. This is the **first official addon** to utilize the **Bitaxe Accessory Port (BAP)** for seamless integration with Bitaxe hardware.
+A sophisticated touchscreen display addon for Bitaxe miners, featuring a 4.3-inch ST7262 RGB LCD with GT911 capacitive touch controller. This is the **first official addon** to utilize the **Bitaxe Accessory Port (BAP)** for seamless integration with Bitaxe hardware.
 
 ## 🌟 Key Features
 
-- **4.3" High-Resolution Display**: 800x480 RGB LCD with ST7701 controller
+- **4.3" High-Resolution Display**: 800x480 RGB LCD with ST7262 controller
 - **Capacitive Touch Interface**: GT911 multi-touch controller for intuitive navigation
 - **BAP Integration**: First-class support for the new Bitaxe Accessory Port protocol
 - **Real-time Mining Dashboard**: Live hashrate, temperature, power consumption monitoring
@@ -23,7 +23,7 @@ A sophisticated touchscreen display addon for Bitaxe miners, featuring a 4.3-inc
 ## 🔧 Hardware Specifications
 
 ### Display Module
-- **LCD Controller**: ST7701 (RGB 16-bit interface)
+- **LCD Controller**: ST72621 (RGB 16-bit interface)
 - **Touch Controller**: GT911 (I2C capacitive touch)
 - **Resolution**: 800x480 pixels
 - **Size**: 4.3 inches diagonal
@@ -46,7 +46,7 @@ A sophisticated touchscreen display addon for Bitaxe miners, featuring a 4.3-inc
 
 ## 📋 Pin Configuration
 
-### RGB LCD Interface (ST7701)
+### RGB LCD Interface (ST7262)
 ```
 Data Pins:    GPIO14, GPIO38, GPIO18, GPIO17, GPIO10, GPIO39, 
               GPIO0, GPIO45, GPIO48, GPIO47, GPIO21, GPIO1, 
