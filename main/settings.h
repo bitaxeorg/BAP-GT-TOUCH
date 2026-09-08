@@ -21,6 +21,8 @@ void settings_initialize(void);
 void settings_screen_destroy(void);
 lv_obj_t* settings_get_screen(void);
 void settings_update_info(const settings_info_t* info);
+void settings_update_auto_fan_control(bool enabled);
+void settings_update_fan_speed_percent(int speed_percent);
 
 void settings_performance_low_clicked(lv_event_t * e);
 void settings_performance_medium_clicked(lv_event_t * e);

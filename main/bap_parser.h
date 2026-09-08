@@ -56,6 +56,20 @@ esp_err_t bap_handle_power_response(const char *value);
 esp_err_t bap_handle_fan_rpm_response(const char *value);
 
 /**
+ * @brief Handle automatic fan control response
+ * @param value Automatic mode as "0" or "1"
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t bap_handle_auto_fan_response(const char *value);
+
+/**
+ * @brief Handle saved manual fan speed response
+ * @param value Manual fan percentage from 0 to 100
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t bap_handle_manual_fan_speed_response(const char *value);
+
+/**
  * @brief Handle share response
  * @param value Share value string
  * @return ESP_OK on success, error code otherwise

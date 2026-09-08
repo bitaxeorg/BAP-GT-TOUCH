@@ -927,6 +927,35 @@ void settings_update_info(const settings_info_t *info)
     }
 }
 
+void settings_update_auto_fan_control(bool enabled)
+{
+    current_settings.auto_fan_control = enabled;
+    update_fan_controls();
+
+    if (auto_fan_checkbox)
+    {
+        if (enabled)
+        {
+            lv_obj_add_state(auto_fan_checkbox, LV_STATE_CHECKED);
+        }
+        else
+        {
+            lv_obj_clear_state(auto_fan_checkbox, LV_STATE_CHECKED);
+        }
+    }
+}
+
+void settings_update_fan_speed_percent(int speed_percent)
+{
+    if (speed_percent < 0 || speed_percent > 100)
+    {
+        return;
+    }
+
+    current_settings.fan_speed_percent = speed_percent;
+    update_fan_controls();
+}
+
 void settings_performance_low_clicked(lv_event_t *e)
 {
     current_settings.performance_mode = PERFORMANCE_LOW;

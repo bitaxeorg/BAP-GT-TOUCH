@@ -14,6 +14,7 @@
 #include "home.h"
 #include "wifi.h"
 #include "block.h"
+#include "settings.h"
 #include "lvgl_port.h"
 
 static const char *TAG = "BAP_PARSER";
@@ -86,6 +87,15 @@ esp_err_t bap_handle_response(const bap_message_t *msg) {
         ret = bap_handle_pool_user_response(msg->value);
     } else if (strcmp(msg->parameter, "fan_speed") == 0) {
         ret = bap_handle_fan_rpm_response(msg->value);
+        /*
+         * These responses are optional. Older ESP-Miner releases omit them
+         * from systemInfo, so each value updates independently without gating
+         * legacy fan RPM or any other BAP telemetry.
+         */
+    } else if (strcmp(msg->parameter, "auto_fan") == 0) {
+        ret = bap_handle_auto_fan_response(msg->value);
+    } else if (strcmp(msg->parameter, "manual_fan_speed") == 0) {
+        ret = bap_handle_manual_fan_speed_response(msg->value);
     } else if (strcmp(msg->parameter, "best_difficulty") == 0) {
         ret = bap_handle_best_difficulty_response(msg->value);
     } else if (strcmp(msg->parameter, "voltage") == 0) {
@@ -184,6 +194,46 @@ esp_err_t bap_handle_fan_rpm_response(const char *value) {
         ESP_LOGW(TAG, "Failed to acquire LVGL mutex for fan speed update");
         return ESP_ERR_TIMEOUT;
     }
+}
+
+esp_err_t bap_handle_auto_fan_response(const char *value) {
+    if (!value || (strcmp(value, "0") != 0 && strcmp(value, "1") != 0)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Received automatic fan control: %s", value);
+
+    if (lvgl_port_lock(100)) {
+        settings_update_auto_fan_control(strcmp(value, "1") == 0);
+        lvgl_port_unlock();
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG, "Failed to acquire LVGL mutex for automatic fan control update");
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t bap_handle_manual_fan_speed_response(const char *value) {
+    if (!value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char *end = NULL;
+    long speed_percent = strtol(value, &end, 10);
+    if (end == value || *end != '\0' || speed_percent < 0 || speed_percent > 100) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Received manual fan speed: %ld%%", speed_percent);
+
+    if (lvgl_port_lock(100)) {
+        settings_update_fan_speed_percent((int)speed_percent);
+        lvgl_port_unlock();
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG, "Failed to acquire LVGL mutex for manual fan speed update");
+    return ESP_ERR_TIMEOUT;
 }
 
 esp_err_t bap_handle_shares_response(const char *value) {
