@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "ota_update.c" "ota_screen.c" "mempool.c" "block.c" "clock.c" "price.c" "Nevan_RUS_96.c" "untyped_96.c" "montserrat_120.c" "montserrat_140.c" "clock-solid-full.c" "cube-solid-full.c" "cubes-solid-full.c" "bap_client.c" "bap_parser.c" "bap_uart.c" "bap_protocol.c" "display_control.c" "display_button_visibility.c" "display_schedule.c" "settings.c" "home.c" "wifi.c" "night.c"
+    SRCS "ota_update.c" "ota_screen.c" "mempool.c" "block.c" "clock.c" "price.c" "Nevan_RUS_96.c" "untyped_96.c" "montserrat_120.c" "montserrat_140.c" "clock-solid-full.c" "cube-solid-full.c" "cubes-solid-full.c" "bap_client.c" "bap_line_buffer.c" "bap_connection_policy.c" "bap_parser.c" "bap_uart.c" "bap_protocol.c" "display_control.c" "display_button_visibility.c" "display_schedule.c" "settings.c" "home.c" "wifi.c" "wifi_reconnect_policy.c" "night.c" "hashrate_chart_scale.c"
         "loading.c"
         "waveshare_rgb_lcd_port.c"
         "main.c"

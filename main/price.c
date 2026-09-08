@@ -9,6 +9,7 @@
 #include "custom_fonts.h"
 #include "lvgl_port.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
@@ -151,9 +152,15 @@ void price_screen_create(void)
 
     apply_cached_price();
 
-    if (price_task_handle == NULL)
-    {
-        xTaskCreate(price_task, "price_fetch_task", 4096, NULL, 5, &price_task_handle);
+    price_service_start();
+}
+
+void price_service_start(void)
+{
+    if (price_task_handle != NULL) return;
+    if (xTaskCreate(price_task, "price_fetch_task", 4096, NULL, 5, &price_task_handle) != pdPASS) {
+        price_task_handle = NULL;
+        ESP_LOGE("price", "Failed to start price refresh service");
     }
 }
 
@@ -196,12 +203,20 @@ static bool price_fetch_once(void)
         return false;
     }
 
+    if (!wifi_https_acquire(15000))
+    {
+        return false;
+    }
+
     if (price_fetch_from_url(PRICE_API_URL))
     {
+        wifi_https_release();
         return true;
     }
 
-    return price_fetch_from_url(PRICE_API_FALLBACK_URL);
+    bool fetched = price_fetch_from_url(PRICE_API_FALLBACK_URL);
+    wifi_https_release();
+    return fetched;
 }
 
 static bool price_ensure_netif(void)
@@ -413,6 +428,17 @@ static void price_task(void *arg)
             continue;
         }
 
+        if (!wifi_is_time_ready())
+        {
+            if (lvgl_port_lock(50))
+            {
+                price_set_status("SYNCING TIME");
+                lvgl_port_unlock();
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
         if (lvgl_port_lock(50))
         {
             price_set_status("LOADING...");
@@ -420,6 +446,7 @@ static void price_task(void *arg)
         }
 
         bool updated = price_fetch_once();
+        if (updated) ESP_LOGI("price", "Price cache refreshed");
         if (lvgl_port_lock(50))
         {
             if (updated)

@@ -1,4 +1,6 @@
 #include "night.h"
+#include "hashrate_chart_scale.h"
+#include "hashrate_chart_layout.h"
 #include "home.h"
 #include "settings.h"
 #include "wifi.h"
@@ -64,15 +66,16 @@ void night_screen_create(void)
 
     // hashrate chart without borders
     hashrate_chart = lv_chart_create(night_screen);
-    lv_obj_set_size(hashrate_chart, SCREEN_WIDTH - 70, SCREEN_HEIGHT - 140);
-    lv_obj_align(hashrate_chart, LV_ALIGN_BOTTOM_RIGHT, 0, -48);
+    lv_obj_set_size(hashrate_chart, SCREEN_WIDTH - HASHRATE_CHART_LEFT_GUTTER,
+                    SCREEN_HEIGHT - HASHRATE_CHART_HEIGHT_REDUCTION);
+    lv_obj_align(hashrate_chart, LV_ALIGN_BOTTOM_RIGHT, 0, -HASHRATE_CHART_BOTTOM_OFFSET);
     lv_obj_set_style_bg_color(hashrate_chart, COLOR_NIGHT_BG, 0);
     lv_obj_set_style_bg_opa(hashrate_chart, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(hashrate_chart, 0, 0);
     lv_obj_set_style_radius(hashrate_chart, 0, 0);
     lv_obj_set_style_pad_all(hashrate_chart, 0, 0);
-    lv_obj_set_style_pad_top(hashrate_chart, 8, 0);
-    lv_obj_set_style_pad_bottom(hashrate_chart, 40, 0);
+    lv_obj_set_style_pad_top(hashrate_chart, HASHRATE_CHART_TOP_PADDING, 0);
+    lv_obj_set_style_pad_bottom(hashrate_chart, HASHRATE_CHART_BOTTOM_PADDING, 0);
     lv_obj_clear_flag(hashrate_chart, LV_OBJ_FLAG_SCROLLABLE);
 
     // Configure chart with right-to-left scrolling
@@ -106,7 +109,9 @@ void night_screen_create(void)
 
     // Show Y axis ticks/labels, keep X axis hidden
     lv_chart_set_axis_tick(hashrate_chart, LV_CHART_AXIS_PRIMARY_X, 0, 0, 0, 0, false, 0);
-    lv_chart_set_axis_tick(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y, 8, 4, 6, 1, true, 70);
+    lv_chart_set_axis_tick(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y,
+                           HASHRATE_CHART_AXIS_MAJOR_TICK_LENGTH, 4, 6, 1, true,
+                           HASHRATE_CHART_AXIS_LABEL_DRAW_SIZE);
 
     lv_chart_set_div_line_count(hashrate_chart, 0, 0);
 
@@ -149,11 +154,16 @@ void night_update_hashrate(const char *hashrate)
     if (!hashrate)
         return;
 
+    // Reject malformed or out-of-range telemetry before it can overflow
+    // LVGL's 16-bit chart coordinates or produce oversized labels.
+    float hashrate_value = 0.0f;
+    if (!hashrate_chart_value_parse(hashrate, &hashrate_value))
+    {
+        return;
+    }
+
     strncpy(last_hashrate_text, hashrate, sizeof(last_hashrate_text) - 1);
     last_hashrate_text[sizeof(last_hashrate_text) - 1] = '\0';
-
-    // Convert string to float for chart
-    float hashrate_value = atof(hashrate);
 
     // Mark that we've received first real data
     if (!first_data_received && hashrate_value > 0)
@@ -183,7 +193,7 @@ void night_update_hashrate(const char *hashrate)
     }
 
     // Update the large hashrate display
-    lv_label_set_text(hashrate_label, hashrate);
+    lv_label_set_text(hashrate_label, last_hashrate_text);
     if (unit_label)
     {
         lv_obj_align_to(unit_label, hashrate_label, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
@@ -210,15 +220,13 @@ void night_update_hashrate(const char *hashrate)
         }
     }
 
-    // Set range with padding for better visual appearance
+    // Use a rounded scale so every generated Y-axis label is easy to scan.
     if (max_value > 0)
     {
-        float range_padding = (max_value - min_value) * 0.1f; // 10% padding
-        float y_min = (min_value > range_padding) ? (min_value - range_padding) : 0;
-        float y_max = max_value + range_padding + 5; // Extra padding at top
-
+        hashrate_chart_scale_t scale;
+        hashrate_chart_scale_calculate(min_value, max_value, &scale);
         lv_chart_set_range(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y,
-                           (lv_coord_t)y_min, (lv_coord_t)y_max);
+                           (lv_coord_t)scale.minimum, (lv_coord_t)scale.maximum);
     }
 }
 
@@ -282,18 +290,17 @@ static void apply_cached_hashrate(void)
 
     if (have_values)
     {
-        float range_padding = (max_value - min_value) * 0.1f;
-        float y_min = (min_value > range_padding) ? (min_value - range_padding) : 0;
-        float y_max = max_value + range_padding + 5;
+        hashrate_chart_scale_t scale;
+        hashrate_chart_scale_calculate(min_value, max_value, &scale);
         lv_chart_set_range(hashrate_chart, LV_CHART_AXIS_PRIMARY_Y,
-                           (lv_coord_t)y_min, (lv_coord_t)y_max);
+                           (lv_coord_t)scale.minimum, (lv_coord_t)scale.maximum);
     }
 }
 
 static void create_bottom_nav(void)
 {
     lv_obj_t *bottom_nav = lv_obj_create(night_screen);
-    lv_obj_set_size(bottom_nav, SCREEN_WIDTH, 64);
+    lv_obj_set_size(bottom_nav, SCREEN_WIDTH, HASHRATE_CHART_NAV_HEIGHT);
     lv_obj_align(bottom_nav, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_bg_color(bottom_nav, COLOR_NAV_BG, 0);
     lv_obj_set_style_bg_opa(bottom_nav, LV_OPA_COVER, 0);

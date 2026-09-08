@@ -4,6 +4,7 @@
 #include "lvgl.h"
 
 void mempool_screen_create(void);
+void mempool_service_start(void);
 void mempool_screen_destroy(void);
 lv_obj_t *mempool_get_screen(void);
 
