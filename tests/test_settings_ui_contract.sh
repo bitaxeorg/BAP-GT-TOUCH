@@ -6,7 +6,7 @@ settings_file="$repo_dir/main/settings.c"
 display_file="$repo_dir/main/display_control.c"
 display_header="$repo_dir/main/display_button_visibility.h"
 
-test "$(rg -c 'style_settings_dropdown\(' "$settings_file")" -eq 5
+test "$(rg -c 'style_settings_dropdown\(' "$settings_file")" -eq 6
 if rg -q 'update_display_schedule_controls' "$settings_file"; then
     echo "schedule controls must remain editable while scheduling is disabled" >&2
     exit 1
@@ -31,7 +31,7 @@ rg -Fq 'lv_obj_align(display_corner_dropdown, LV_ALIGN_TOP_LEFT, 0, 166)' "$sett
 rg -Fq 'lv_obj_set_width(display_button_mode_hint, 650)' "$settings_file"
 rg -Fq 'lv_obj_align(display_button_mode_hint, LV_ALIGN_TOP_LEFT, 0, 210)' "$settings_file"
 rg -Fq 'lv_label_set_long_mode(display_button_mode_hint, LV_LABEL_LONG_WRAP)' "$settings_file"
-rg -Fq 'lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 740)' "$settings_file"
+rg -Fq 'lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 820)' "$settings_file"
 rg -q 'display_button_mode_from_config' "$settings_file"
 rg -q 'display_button_mode_corner' "$settings_file"
 rg -q 'display_button_mode_shows_visuals' "$settings_file"

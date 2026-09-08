@@ -1,4 +1,5 @@
 #include "wifi.h"
+#include "wifi_reconnect_policy.h"
 #include "home.h"
 #include "bap.h"
 #include "settings.h"
@@ -18,7 +19,9 @@
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "freertos/timers.h"
+#include <time.h>
 
 static const char* TAG = "wifi_screen";
 
@@ -42,9 +45,16 @@ static lv_obj_t * connection_spinner = NULL;
 static bool wifi_initialized = false;
 static bool wifi_event_handlers_registered = false;
 static bool wifi_connect_pending = false;
+static bool wifi_reconnect_enabled = false;
+static uint32_t wifi_reconnect_attempt = 0;
+static int64_t wifi_reconnect_due_us = 0;
+static EventGroupHandle_t wifi_link_events = NULL;
+#define WIFI_LINK_CHANGED BIT0
+static char miner_ip[16] = {0};
 static esp_netif_t *wifi_sta_netif = NULL;
 static bool wifi_bap_ssid_received = false;
 static bool wifi_bap_password_received = false;
+static SemaphoreHandle_t wifi_https_mutex = NULL;
 
 typedef enum {
     WIFI_CONNECTION_STATE_DISCONNECTED = 0,
@@ -67,6 +77,8 @@ static wifi_info_t current_wifi_info = {
 };
 
 static void wifi_try_connect_from_bap(void);
+static void wifi_schedule_reconnect(void);
+static esp_err_t wifi_connect_with_credentials(const char *ssid, const char *password);
 static esp_err_t wifi_init_common(void);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static void wifi_refresh_status_ui(void);
@@ -282,52 +294,26 @@ static void wifi_scan_done_handler(void)
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     LV_UNUSED(arg);
-
+    LV_UNUSED(event_data);
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
-        ESP_LOGI(TAG, "WIFI_EVENT_SCAN_DONE received");
-        // Set flag for LVGL task to process - don't call handler from event context
-        // (event task has small stack, LVGL operations must be on LVGL task)
         scan_event_received = true;
-        return;
-    }
-
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        if (wifi_connect_pending) {
-            esp_wifi_connect();
-        }
-        return;
-    }
-
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (wifi_connect_pending) {
-            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
-            esp_wifi_connect();
-        } else if (wifi_connection_state != WIFI_CONNECTION_STATE_FAILED) {
-            wifi_set_connection_state(WIFI_CONNECTION_STATE_DISCONNECTED);
-        } else {
-            wifi_refresh_status_ui();
-        }
-        return;
-    }
-
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        // Don't update IP address here - use BAP-provided IP instead
-        // snprintf(current_wifi_info.ip_address, sizeof(current_wifi_info.ip_address), IPSTR, IP2STR(&event->ip_info.ip));
-        LV_UNUSED(event);
-        wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
-        // Don't update IP label here - will be updated via BAP protocol
-        // if (ip_label) {
-        //     char ip_text[32];
-        //     snprintf(ip_text, sizeof(ip_text), "IP: %s", current_wifi_info.ip_address);
-        //     lv_label_set_text(ip_label, ip_text);
-        // }
-        return;
+    } else if ((event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) ||
+               (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)) {
+        /* The LVGL task owns connection state and all widget updates. */
+        xEventGroupSetBits(wifi_link_events, WIFI_LINK_CHANGED);
     }
 }
 
 static esp_err_t wifi_init_common(void)
 {
+    if (!wifi_https_mutex) {
+        wifi_https_mutex = xSemaphoreCreateMutex();
+        if (!wifi_https_mutex) {
+            ESP_LOGE(TAG, "Failed to create HTTPS transport mutex");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
     if (wifi_initialized) {
         return ESP_OK;
     }
@@ -335,9 +321,13 @@ static esp_err_t wifi_init_common(void)
     ESP_LOGI(TAG, "Initializing WiFi");
 
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        ret = nvs_flash_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize WiFi storage: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    if (!wifi_link_events) {
+        wifi_link_events = xEventGroupCreate();
+        if (!wifi_link_events) return ESP_ERR_NO_MEM;
     }
 
     ret = esp_netif_init();
@@ -381,8 +371,79 @@ static esp_err_t wifi_init_common(void)
         return ret;
     }
 
+    ret = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to disable WiFi power save: %s", esp_err_to_name(ret));
+    }
+
     wifi_initialized = true;
     ESP_LOGI(TAG, "WiFi initialized successfully");
+    return ESP_OK;
+}
+
+static void wifi_schedule_reconnect(void)
+{
+    wifi_connect_pending = false;
+    wifi_connect_deadline_us = 0;
+    current_wifi_info.ip_address[0] = '\0';
+    wifi_set_connection_state(WIFI_CONNECTION_STATE_DISCONNECTED);
+    if (wifi_reconnect_enabled && wifi_reconnect_due_us == 0) {
+        uint32_t delay_ms = wifi_reconnect_delay_ms(wifi_reconnect_attempt);
+        if (wifi_reconnect_attempt < UINT32_MAX) wifi_reconnect_attempt++;
+        wifi_reconnect_due_us = esp_timer_get_time() + (int64_t)delay_ms * 1000;
+        ESP_LOGW(TAG, "WiFi retry scheduled in %lu ms", (unsigned long)delay_ms);
+    }
+}
+
+static esp_err_t wifi_begin_connection(void)
+{
+    wifi_reconnect_due_us = 0;
+    wifi_connect_pending = true;
+    wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
+    esp_err_t ret = esp_wifi_connect();
+    if (ret != ESP_OK) wifi_schedule_reconnect();
+    return ret;
+}
+
+esp_err_t wifi_start_saved_connection(void)
+{
+    esp_err_t ret = wifi_init_common();
+    if (ret != ESP_OK) return ret;
+    wifi_config_t config = {0};
+    ret = esp_wifi_get_config(WIFI_IF_STA, &config);
+    if (ret != ESP_OK) return ret;
+    if (config.sta.ssid[0] == '\0') return ESP_ERR_NOT_FOUND;
+    if (wifi_reconnect_enabled) return ESP_OK;
+    snprintf(current_wifi_info.ssid, sizeof(current_wifi_info.ssid), "%.*s",
+             (int)sizeof(config.sta.ssid), (const char *)config.sta.ssid);
+    wifi_reconnect_enabled = true;
+    return wifi_begin_connection();
+}
+
+static esp_err_t wifi_connect_with_credentials(const char *ssid, const char *password)
+{
+    if (!ssid || !ssid[0] || !password) return ESP_ERR_INVALID_ARG;
+    if (strlen(ssid) > 32 || strlen(password) > 64) return ESP_ERR_INVALID_ARG;
+    esp_err_t ret = wifi_init_common();
+    if (ret != ESP_OK) return ret;
+    wifi_config_t config = {0};
+    memcpy(config.sta.ssid, ssid, strlen(ssid));
+    memcpy(config.sta.password, password, strlen(password));
+    wifi_config_t active = {0};
+    if (esp_wifi_get_config(WIFI_IF_STA, &active) == ESP_OK &&
+        memcmp(active.sta.ssid, config.sta.ssid, sizeof(config.sta.ssid)) == 0 &&
+        memcmp(active.sta.password, config.sta.password, sizeof(config.sta.password)) == 0 &&
+        wifi_reconnect_enabled) {
+        /* Repeated BAP credentials must not interrupt a connection or retry. */
+        return ESP_OK;
+    }
+    esp_wifi_disconnect();
+    ret = esp_wifi_set_config(WIFI_IF_STA, &config);
+    if (ret != ESP_OK) return ret;
+    wifi_reconnect_enabled = true;
+    wifi_reconnect_attempt = 0;
+    /* Defer the new attempt until the old disconnect event has drained. */
+    wifi_schedule_reconnect();
     return ESP_OK;
 }
 
@@ -792,32 +853,14 @@ void wifi_update_ssid(const char* ssid)
 
 void wifi_update_rssi(const char* rssi)
 {
-    if(rssi) {
-        current_wifi_info.signal_strength = atoi(rssi);
-
-        if (current_wifi_info.signal_strength > -128) {
-            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
-        } else if (!wifi_connect_pending) {
-            wifi_set_connection_state(WIFI_CONNECTION_STATE_DISCONNECTED);
-        }
-
-        wifi_refresh_status_ui();
-    }
+    /* BAP signal strength belongs to the miner, not the display's station. */
+    LV_UNUSED(rssi);
 }
 
 void wifi_update_ip(const char* ip)
 {
-    if(ip) {
-        strncpy(current_wifi_info.ip_address, ip, sizeof(current_wifi_info.ip_address) - 1);
-        current_wifi_info.ip_address[sizeof(current_wifi_info.ip_address) - 1] = '\0';
-
-        if (current_wifi_info.ip_address[0] != '\0' &&
-            strcmp(current_wifi_info.ip_address, "0.0.0.0") != 0) {
-            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
-        }
-
-        wifi_refresh_status_ui();
-    }
+    /* Preserve the miner-IP accessor used by Home, without changing local state. */
+    if (ip) snprintf(miner_ip, sizeof(miner_ip), "%s", ip);
 }
 
 void wifi_update_password(const char* password)
@@ -840,30 +883,45 @@ void wifi_update_password(const char* password)
 bool wifi_is_connected(void)
 {
     esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (sta)
+    if (sta && esp_netif_is_netif_up(sta))
     {
         esp_netif_ip_info_t ip_info;
         if (esp_netif_get_ip_info(sta, &ip_info) == ESP_OK && ip_info.ip.addr != 0)
         {
-            current_wifi_info.is_connected = true;
             return true;
         }
     }
 
-    wifi_ap_record_t ap_info;
-    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
-    {
-        current_wifi_info.is_connected = true;
-        return true;
+    return false;
+}
+
+bool wifi_is_time_ready(void)
+{
+    time_t now = time(NULL);
+    struct tm time_info;
+    localtime_r(&now, &time_info);
+    return time_info.tm_year >= (2023 - 1900);
+}
+
+bool wifi_https_acquire(uint32_t timeout_ms)
+{
+    if (!wifi_https_mutex) {
+        return false;
     }
 
-    current_wifi_info.is_connected = false;
-    return false;
+    return xSemaphoreTake(wifi_https_mutex, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
+}
+
+void wifi_https_release(void)
+{
+    if (wifi_https_mutex) {
+        xSemaphoreGive(wifi_https_mutex);
+    }
 }
 
 const char *wifi_get_current_ip(void)
 {
-    return current_wifi_info.ip_address;
+    return miner_ip;
 }
 
 lv_obj_t* wifi_get_screen(void)
@@ -875,15 +933,31 @@ lv_obj_t* wifi_get_screen(void)
 void wifi_task_handler(void)
 {
     wifi_check_scan_completion();
-
-    if (wifi_connection_state == WIFI_CONNECTION_STATE_CONNECTING &&
-        wifi_connect_deadline_us > 0 &&
-        esp_timer_get_time() >= wifi_connect_deadline_us) {
-        wifi_connect_pending = false;
-        wifi_connect_deadline_us = 0;
-        esp_wifi_disconnect();
-        wifi_set_connection_state(WIFI_CONNECTION_STATE_FAILED);
+    if (!wifi_link_events) return;
+    EventBits_t events = xEventGroupWaitBits(wifi_link_events, WIFI_LINK_CHANGED,
+                                            pdTRUE, pdFALSE, 0);
+    if (events & WIFI_LINK_CHANGED) {
+        if (wifi_is_connected() && wifi_reconnect_due_us == 0) {
+            esp_netif_ip_info_t ip;
+            if (esp_netif_get_ip_info(wifi_sta_netif, &ip) == ESP_OK) {
+                snprintf(current_wifi_info.ip_address, sizeof(current_wifi_info.ip_address),
+                         IPSTR, IP2STR(&ip.ip));
+            }
+            wifi_ap_record_t ap;
+            if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) current_wifi_info.signal_strength = ap.rssi;
+            wifi_reconnect_attempt = 0;
+            wifi_reconnect_due_us = 0;
+            wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTED);
+        } else {
+            wifi_schedule_reconnect();
+        }
     }
+    int64_t now = esp_timer_get_time();
+    if (wifi_connect_pending && wifi_connect_deadline_us > 0 && now >= wifi_connect_deadline_us) {
+        esp_wifi_disconnect();
+        wifi_schedule_reconnect();
+    }
+    if (wifi_reconnect_due_us > 0 && now >= wifi_reconnect_due_us) wifi_begin_connection();
 }
 
 // Function to update the SSID dropdown with scan results
@@ -935,6 +1009,8 @@ void wifi_connect_clicked(lv_event_t * e)
             lv_label_set_text(ssid_label, current_wifi_info.ssid);
         }
 
+        esp_err_t ret = wifi_connect_with_credentials(selected_ssid, password);
+        if (ret != ESP_OK) ESP_LOGW(TAG, "WiFi connection could not start: %s", esp_err_to_name(ret));
         BAP_send_ssid(selected_ssid);
         BAP_send_password(password);
     }
@@ -942,34 +1018,9 @@ void wifi_connect_clicked(lv_event_t * e)
 
 static void wifi_try_connect_from_bap(void)
 {
-    if (!wifi_bap_ssid_received || !wifi_bap_password_received) {
-        return;
-    }
-
-    if (current_wifi_info.ssid[0] == '\0') {
-        return;
-    }
-
-    esp_err_t ret = wifi_init_common();
-    if (ret != ESP_OK) {
-        return;
-    }
-
-    wifi_config_t wifi_config = {0};
-    strncpy((char *)wifi_config.sta.ssid, current_wifi_info.ssid, sizeof(wifi_config.sta.ssid) - 1);
-    strncpy((char *)wifi_config.sta.password, current_wifi_info.password, sizeof(wifi_config.sta.password) - 1);
-    wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
-    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
-
-    ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set WiFi config: %s", esp_err_to_name(ret));
-        return;
-    }
-
-    wifi_connect_pending = true;
-    esp_wifi_connect();
-    wifi_set_connection_state(WIFI_CONNECTION_STATE_CONNECTING);
+    if (!wifi_bap_ssid_received || !wifi_bap_password_received) return;
+    esp_err_t ret = wifi_connect_with_credentials(current_wifi_info.ssid, current_wifi_info.password);
+    if (ret != ESP_OK) ESP_LOGW(TAG, "BAP WiFi connection could not start: %s", esp_err_to_name(ret));
 }
 
 void wifi_scan_clicked(lv_event_t * e)

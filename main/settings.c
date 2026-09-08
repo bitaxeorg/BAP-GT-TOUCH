@@ -13,6 +13,8 @@
 #include "waveshare_rgb_lcd_port.h"
 #include "ota_update.h"
 #include "display_control.h"
+#include "theme.h"
+#include "dropdown_style.h"
 #include <stdlib.h>
 #include <time.h>
 #include "nvs_flash.h"
@@ -31,6 +33,8 @@ static lv_obj_t *fan_save_btn = NULL;
 static lv_obj_t *brightness_slider = NULL;
 static lv_obj_t *brightness_value_label = NULL;
 static lv_obj_t *timezone_dropdown = NULL;
+static lv_obj_t *accent_theme_dropdown = NULL;
+static lv_obj_t *settings_main_cont = NULL;
 static lv_obj_t *display_schedule_checkbox = NULL;
 static lv_obj_t *display_off_dropdown = NULL;
 static lv_obj_t *display_on_dropdown = NULL;
@@ -77,6 +81,13 @@ static const char *timezone_values[] = {
     "AEST-10AEDT,M10.1.0/2,M4.1.0/3",
 };
 
+static const char *accent_theme_options =
+    "Red\n"
+    "Orange\n"
+    "Blue\n"
+    "Green\n"
+    "Purple";
+
 static const char *display_time_options =
     "12:00 AM\n12:30 AM\n1:00 AM\n1:30 AM\n2:00 AM\n2:30 AM\n"
     "3:00 AM\n3:30 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n"
@@ -97,33 +108,13 @@ static const char *display_corner_options =
 #define SETTINGS_NVS_TZ_INDEX_KEY "tz_index"
 
 static void settings_display_schedule_changed(lv_event_t *e);
+static void settings_accent_theme_changed(lv_event_t *e);
+static void settings_reload_theme_async(void *user_data);
 
 static void style_settings_dropdown(lv_obj_t *dropdown, const lv_font_t *font)
 {
-    lv_obj_set_style_bg_color(dropdown, COLOR_CARD_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(dropdown, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(dropdown, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(dropdown, COLOR_ACCENT, LV_PART_MAIN);
-    lv_obj_set_style_border_opa(dropdown, LV_OPA_70, LV_PART_MAIN);
-    lv_obj_set_style_radius(dropdown, 8, LV_PART_MAIN);
-    lv_obj_set_style_text_color(dropdown, COLOR_TEXT_PRIMARY, LV_PART_MAIN);
-    lv_obj_set_style_text_font(dropdown, font, LV_PART_MAIN);
-    lv_obj_set_style_text_color(dropdown, COLOR_ACCENT, LV_PART_INDICATOR);
-
-    lv_obj_t *list = lv_dropdown_get_list(dropdown);
-    if (list) {
-        lv_obj_set_style_bg_color(list, COLOR_CARD_BG, LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(list, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_width(list, 1, LV_PART_MAIN);
-        lv_obj_set_style_border_color(list, COLOR_ACCENT, LV_PART_MAIN);
-        lv_obj_set_style_radius(list, 8, LV_PART_MAIN);
-        lv_obj_set_style_text_color(list, COLOR_TEXT_PRIMARY, LV_PART_MAIN);
-        lv_obj_set_style_text_font(list, font, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(list, COLOR_ACCENT, LV_PART_SELECTED);
-        lv_obj_set_style_bg_opa(list, LV_OPA_COVER, LV_PART_SELECTED);
-        lv_obj_set_style_text_color(list, COLOR_TEXT_ON_ACCENT, LV_PART_SELECTED);
-        lv_obj_set_style_text_font(list, font, LV_PART_SELECTED);
-    }
+    dropdown_style_apply(dropdown, font, COLOR_CARD_BG, COLOR_TEXT_PRIMARY,
+                         COLOR_ACCENT, COLOR_TEXT_ON_ACCENT);
 }
 
 static lv_obj_t *create_settings_button(lv_obj_t *parent, const char *text, lv_event_cb_t event_cb, bool active)
@@ -336,6 +327,7 @@ void settings_initialize(void)
         return;
     }
 
+    theme_initialize();
     settings_load_timezone();
     size_t timezone_count = sizeof(timezone_values) / sizeof(timezone_values[0]);
     if (current_timezone_index < 0 || (size_t)current_timezone_index >= timezone_count) {
@@ -545,6 +537,7 @@ void settings_screen_create(void)
     lv_obj_set_scrollbar_mode(settings_screen, LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_t *main_cont = lv_obj_create(settings_screen);
+    settings_main_cont = main_cont;
     lv_obj_set_size(main_cont, SCREEN_WIDTH - 60, SCREEN_HEIGHT - 100);
     lv_obj_align(main_cont, LV_ALIGN_TOP_MID, 0, 16);
     lv_obj_set_style_bg_color(main_cont, COLOR_CARD_BG, 0);
@@ -677,9 +670,32 @@ void settings_screen_create(void)
     lv_obj_set_style_text_font(brightness_value_label, &lv_font_montserrat_22, 0);
     lv_obj_align(brightness_value_label, LV_ALIGN_TOP_LEFT, 600, 26);
 
+    lv_obj_t *theme_section = lv_obj_create(main_cont);
+    lv_obj_set_size(theme_section, 680, 70);
+    lv_obj_align(theme_section, LV_ALIGN_TOP_MID, 0, 430);
+    lv_obj_set_style_bg_opa(theme_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(theme_section, 0, 0);
+    lv_obj_set_style_pad_all(theme_section, 10, 0);
+    lv_obj_clear_flag(theme_section, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *theme_title = lv_label_create(theme_section);
+    lv_label_set_text(theme_title, "Display Color:");
+    lv_obj_set_style_text_color(theme_title, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(theme_title, &lv_font_montserrat_18, 0);
+    lv_obj_align(theme_title, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    accent_theme_dropdown = lv_dropdown_create(theme_section);
+    lv_obj_set_size(accent_theme_dropdown, 300, 36);
+    lv_obj_align(accent_theme_dropdown, LV_ALIGN_TOP_LEFT, 170, -4);
+    lv_dropdown_set_options(accent_theme_dropdown, accent_theme_options);
+    lv_dropdown_set_selected(accent_theme_dropdown, (uint16_t)theme_get_accent());
+    style_settings_dropdown(accent_theme_dropdown, &lv_font_montserrat_16);
+    lv_obj_add_event_cb(accent_theme_dropdown, settings_accent_theme_changed,
+                        LV_EVENT_VALUE_CHANGED, NULL);
+
     lv_obj_t *timezone_section = lv_obj_create(main_cont);
     lv_obj_set_size(timezone_section, 680, 50);
-    lv_obj_align(timezone_section, LV_ALIGN_TOP_MID, 0, 430);
+    lv_obj_align(timezone_section, LV_ALIGN_TOP_MID, 0, 510);
     lv_obj_set_style_bg_opa(timezone_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(timezone_section, 0, 0);
     lv_obj_set_style_pad_all(timezone_section, 10, 0);
@@ -704,7 +720,7 @@ void settings_screen_create(void)
 
     lv_obj_t *display_section = lv_obj_create(main_cont);
     lv_obj_set_size(display_section, 680, 250);
-    lv_obj_align(display_section, LV_ALIGN_TOP_MID, 0, 480);
+    lv_obj_align(display_section, LV_ALIGN_TOP_MID, 0, 560);
     lv_obj_set_style_bg_opa(display_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(display_section, 0, 0);
     lv_obj_set_style_pad_all(display_section, 10, 0);
@@ -782,7 +798,7 @@ void settings_screen_create(void)
     // OTA Update Section
     lv_obj_t *ota_section = lv_obj_create(main_cont);
     lv_obj_set_size(ota_section, 680, 160);
-    lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 740);
+    lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 820);
     lv_obj_set_style_bg_opa(ota_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ota_section, 0, 0);
     lv_obj_set_style_pad_all(ota_section, 10, 0);
@@ -876,6 +892,8 @@ void settings_screen_destroy(void)
         brightness_slider = NULL;
         brightness_value_label = NULL;
         timezone_dropdown = NULL;
+        accent_theme_dropdown = NULL;
+        settings_main_cont = NULL;
         display_schedule_checkbox = NULL;
         display_off_dropdown = NULL;
         display_on_dropdown = NULL;
@@ -1056,6 +1074,43 @@ void settings_brightness_slider_changed(lv_event_t *e)
     lcd_backlight_set_brightness(current_settings.brightness_percent);
 
     printf("Screen brightness set to: %d%%\n", current_settings.brightness_percent);
+}
+
+static void settings_reload_theme_async(void *user_data)
+{
+    LV_UNUSED(user_data);
+    if (!settings_screen || lv_scr_act() != settings_screen) return;
+
+    /* Two full Settings trees exceed the LVGL pool. Keep a minimal active
+     * screen while destroy releases the old widgets, timers and references. */
+    lv_coord_t scroll_y = settings_main_cont ? lv_obj_get_scroll_y(settings_main_cont) : 390;
+    lv_obj_t *holding_screen = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(holding_screen, COLOR_BACKGROUND, 0);
+    lv_scr_load(holding_screen);
+    settings_screen_destroy();
+    settings_screen_create();
+    lv_scr_load(settings_screen);
+    lv_obj_del(holding_screen);
+
+    if (settings_main_cont) {
+        lv_obj_update_layout(settings_main_cont);
+        lv_obj_scroll_to_y(settings_main_cont, scroll_y, LV_ANIM_OFF);
+    }
+}
+
+static void settings_accent_theme_changed(lv_event_t *e)
+{
+    lv_obj_t *dropdown = lv_event_get_target(e);
+    accent_theme_t selected = (accent_theme_t)lv_dropdown_get_selected(dropdown);
+    esp_err_t err = theme_set_accent(selected);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save accent color: %s", esp_err_to_name(err));
+        lv_dropdown_set_selected(dropdown, (uint16_t)theme_get_accent());
+        return;
+    }
+
+    lv_async_call_cancel(settings_reload_theme_async, NULL);
+    lv_async_call(settings_reload_theme_async, NULL);
 }
 
 void settings_timezone_changed(lv_event_t *e)

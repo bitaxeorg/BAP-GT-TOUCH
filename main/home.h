@@ -2,6 +2,7 @@
 #define HOME_H
 
 #include "lvgl.h"
+#include "theme.h"
 
 // Hardware information structure
 typedef struct {
@@ -24,11 +25,11 @@ typedef struct {
 // Colors (Bitaxe site theme)
 #define COLOR_BACKGROUND    lv_color_hex(0x050506)
 #define COLOR_CARD_BG       lv_color_hex(0x0F1218)
-#define COLOR_ACCENT        lv_color_hex(0xD4021B)
+#define COLOR_ACCENT        theme_get_accent_color()
 #define COLOR_RED           lv_color_hex(0xD4021B)
 #define COLOR_TEXT_PRIMARY  lv_color_hex(0xFFFFFF)
 #define COLOR_TEXT_SECONDARY lv_color_hex(0xA3A3A3)
-#define COLOR_TEXT_ON_ACCENT lv_color_hex(0x000000)
+#define COLOR_TEXT_ON_ACCENT theme_get_text_on_accent_color()
 #define COLOR_BORDER        lv_color_hex(0x1A1D24)
 #define COLOR_NAV_BG        lv_color_hex(0x0C0F14)
 

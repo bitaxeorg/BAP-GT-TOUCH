@@ -27,6 +27,11 @@ static lv_obj_t *fan_label = NULL;
 static lv_obj_t *shares_label = NULL;
 static lv_obj_t *bd_label = NULL;
 
+#define HOME_CARD_WIDTH (SCREEN_WIDTH - 60)
+#define HOME_ACTION_ROW_WIDTH 680
+#define HOME_ACTION_BUTTON_WIDTH 220
+#define HOME_ACTION_BUTTON_HEIGHT 60
+
 static float current_power_watts = 0.0f;
 static float current_hashrate_ghs = 0.0f;
 static char current_hashrate_text[16] = "";
@@ -53,14 +58,23 @@ static void apply_cached_home_values(void);
 
 static lv_obj_t *create_nav_button(lv_obj_t *parent, const char *text, lv_event_cb_t event_cb)
 {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_set_size(btn, 220, 60);
+    // Keep these controls fully local-styled so their appearance is stable
+    // across accent colors and LVGL interaction states.
+    lv_obj_t *btn = lv_obj_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_set_size(btn, HOME_ACTION_BUTTON_WIDTH, HOME_ACTION_BUTTON_HEIGHT);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(btn, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_bg_color(btn, COLOR_ACCENT, 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(btn, 0, 0);
     lv_obj_set_style_border_opa(btn, LV_OPA_TRANSP, 0);
     lv_obj_set_style_radius(btn, 8, 0);
     lv_obj_set_style_shadow_width(btn, 0, 0);
+    lv_obj_set_style_outline_width(btn, 0, 0);
+    lv_obj_set_style_transform_width(btn, 0, 0);
+    lv_obj_set_style_transform_height(btn, 0, 0);
 
     lv_obj_set_style_bg_color(btn, COLOR_ACCENT, LV_STATE_PRESSED);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_PRESSED);
@@ -423,7 +437,7 @@ void home_screen_create(void)
     lv_obj_set_scrollbar_mode(home_screen, LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_t *main_cont = lv_obj_create(home_screen);
-    lv_obj_set_size(main_cont, SCREEN_WIDTH - 60, SCREEN_HEIGHT - 100);
+    lv_obj_set_size(main_cont, HOME_CARD_WIDTH, SCREEN_HEIGHT - 100);
     lv_obj_align(main_cont, LV_ALIGN_TOP_MID, 0, 16);
     lv_obj_set_style_bg_color(main_cont, COLOR_CARD_BG, 0);
     lv_obj_set_style_bg_opa(main_cont, LV_OPA_COVER, 0);
@@ -583,7 +597,7 @@ void home_screen_create(void)
     lv_obj_align(fan_label, LV_ALIGN_CENTER, 0, 24);
 
     lv_obj_t *nav_cont = lv_obj_create(main_cont);
-    lv_obj_set_size(nav_cont, 680, 70);
+    lv_obj_set_size(nav_cont, HOME_ACTION_ROW_WIDTH, 70);
     lv_obj_align(nav_cont, LV_ALIGN_BOTTOM_MID, 0, -8);
     lv_obj_set_style_bg_opa(nav_cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(nav_cont, 0, 0);
@@ -591,6 +605,7 @@ void home_screen_create(void)
     lv_obj_clear_flag(nav_cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(nav_cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_flex_flow(nav_cont, LV_FLEX_FLOW_ROW);
+    // Preserve the stock-sized controls and intentional outer breathing room.
     lv_obj_set_flex_align(nav_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     create_nav_button(nav_cont, "Hardware", home_hardware_clicked);

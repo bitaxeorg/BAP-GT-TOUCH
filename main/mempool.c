@@ -181,9 +181,15 @@ void mempool_screen_create(void)
 
     mempool_rebuild_cards();
 
-    if (mempool_task_handle == NULL)
-    {
-        xTaskCreate(mempool_task, "mempool_task", 6144, NULL, 5, &mempool_task_handle);
+    mempool_service_start();
+}
+
+void mempool_service_start(void)
+{
+    if (mempool_task_handle != NULL) return;
+    if (xTaskCreate(mempool_task, "mempool_task", 6144, NULL, 5, &mempool_task_handle) != pdPASS) {
+        mempool_task_handle = NULL;
+        ESP_LOGE("mempool", "Failed to start mempool refresh service");
     }
 }
 
@@ -266,6 +272,7 @@ static void mempool_task(void *arg)
         }
 
         bool updated = mempool_fetch_once();
+        if (updated) ESP_LOGI("mempool", "Mempool cache refreshed");
         if (lvgl_port_lock(50))
         {
             if (updated)
@@ -287,6 +294,11 @@ static void mempool_task(void *arg)
 
 static bool mempool_fetch_once(void)
 {
+    if (!wifi_https_acquire(30000))
+    {
+        return false;
+    }
+
     esp_http_client_config_t config = {
         .url = MEMPOOL_API_URL,
         .event_handler = mempool_http_event_handler,
@@ -306,12 +318,14 @@ static bool mempool_fetch_once(void)
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client)
     {
+        wifi_https_release();
         return false;
     }
 
     esp_err_t err = esp_http_client_perform(client);
     int status = esp_http_client_get_status_code(client);
     esp_http_client_cleanup(client);
+    wifi_https_release();
 
     if (err != ESP_OK || status < 200 || status >= 300 || mempool_http_len == 0)
     {
