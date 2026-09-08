@@ -119,6 +119,7 @@ The primary screen displays real-time mining information:
 Comprehensive configuration options:
 
 - **Display Settings**: Brightness control, manual backlight power, and an optional daily on/off schedule
+- **Default Page**: Choose which content screen opens after startup; the selection persists across reboots
 - **Mining Parameters**: Frequency, voltage, fan control
 - **Network Config**: WiFi SSID/password setup
 - **Hardware Control**: ASIC voltage, automatic fan control

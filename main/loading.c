@@ -9,6 +9,12 @@
  *********************/
 #include "loading.h"
 #include "home.h"
+#include "block.h"
+#include "clock.h"
+#include "mempool.h"
+#include "night.h"
+#include "price.h"
+#include "settings.h"
 #include "custom_fonts.h"
 #include "assets/logo_background.c"
 #include "esp_log.h"
@@ -41,6 +47,7 @@ static uint8_t progress_value = 0;
  **********************/
 static void loading_timer_cb(lv_timer_t *timer);
 static void finish_loading(void);
+static void load_configured_startup_page(void);
 static void bap_init_task(void *pvParameters);
 
 /**********************
@@ -152,10 +159,44 @@ static void finish_loading(void)
     lv_timer_del(loading_timer);
 
     lv_obj_clean(screen);
-    home_screen_create();
-    lv_scr_load(home_get_screen());
+    load_configured_startup_page();
     display_control_create_power_button();
 
     ESP_LOGI(TAG, "Creating BAP initialization task...");
     xTaskCreate(bap_init_task, "bap_init", 8192, NULL, 10, NULL);
+}
+
+static void load_configured_startup_page(void)
+{
+    startup_page_t startup_page = settings_get_startup_page();
+    ESP_LOGI(TAG, "Loading configured startup page: %u", (unsigned)startup_page);
+
+    switch (startup_page)
+    {
+    case STARTUP_PAGE_PRICE:
+        price_screen_create();
+        lv_scr_load(price_get_screen());
+        break;
+    case STARTUP_PAGE_BLOCKS:
+        block_screen_create();
+        lv_scr_load(block_get_screen());
+        break;
+    case STARTUP_PAGE_MEMPOOL:
+        mempool_screen_create();
+        lv_scr_load(mempool_get_screen());
+        break;
+    case STARTUP_PAGE_CLOCK:
+        clock_screen_create();
+        lv_scr_load(clock_get_screen());
+        break;
+    case STARTUP_PAGE_HASHRATE:
+        night_screen_create();
+        lv_scr_load(night_get_screen());
+        break;
+    case STARTUP_PAGE_HOME:
+    default:
+        home_screen_create();
+        lv_scr_load(home_get_screen());
+        break;
+    }
 }

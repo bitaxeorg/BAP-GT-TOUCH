@@ -31,6 +31,7 @@ static lv_obj_t *fan_save_btn = NULL;
 static lv_obj_t *brightness_slider = NULL;
 static lv_obj_t *brightness_value_label = NULL;
 static lv_obj_t *timezone_dropdown = NULL;
+static lv_obj_t *startup_page_dropdown = NULL;
 static lv_obj_t *display_schedule_checkbox = NULL;
 static lv_obj_t *display_off_dropdown = NULL;
 static lv_obj_t *display_on_dropdown = NULL;
@@ -52,6 +53,7 @@ static settings_info_t current_settings = {
     .brightness_percent = 100};
 
 static int current_timezone_index = 0;
+static startup_page_t current_startup_page = STARTUP_PAGE_HOME;
 static bool settings_initialized = false;
 
 static const char *timezone_options =
@@ -77,6 +79,35 @@ static const char *timezone_values[] = {
     "AEST-10AEDT,M10.1.0/2,M4.1.0/3",
 };
 
+static const char *startup_page_options =
+    "Home Dashboard\n"
+    "Latest Blocks\n"
+    "Mempool\n"
+    "Clock\n"
+    "Bitcoin Price\n"
+    "Hashrate Chart";
+
+static const startup_page_t startup_page_option_values[] = {
+    STARTUP_PAGE_HOME,
+    STARTUP_PAGE_BLOCKS,
+    STARTUP_PAGE_MEMPOOL,
+    STARTUP_PAGE_CLOCK,
+    STARTUP_PAGE_PRICE,
+    STARTUP_PAGE_HASHRATE,
+};
+
+static uint16_t startup_page_dropdown_index(startup_page_t page)
+{
+    for (uint16_t i = 0; i < sizeof(startup_page_option_values) / sizeof(startup_page_option_values[0]); i++)
+    {
+        if (startup_page_option_values[i] == page)
+        {
+            return i;
+        }
+    }
+    return 0;
+}
+
 static const char *display_time_options =
     "12:00 AM\n12:30 AM\n1:00 AM\n1:30 AM\n2:00 AM\n2:30 AM\n"
     "3:00 AM\n3:30 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n"
@@ -95,6 +126,7 @@ static const char *display_corner_options =
 
 #define SETTINGS_NVS_NAMESPACE "settings"
 #define SETTINGS_NVS_TZ_INDEX_KEY "tz_index"
+#define SETTINGS_NVS_STARTUP_PAGE_KEY "start_page"
 
 static void settings_display_schedule_changed(lv_event_t *e);
 
@@ -266,7 +298,7 @@ static void apply_timezone_by_index(int index)
     tzset();
 }
 
-static void settings_load_timezone(void)
+static void settings_load_persisted_values(void)
 {
     static bool nvs_ready = false;
     if (!nvs_ready)
@@ -293,11 +325,18 @@ static void settings_load_timezone(void)
 
     int32_t saved_index = 0;
     err = nvs_get_i32(handle, SETTINGS_NVS_TZ_INDEX_KEY, &saved_index);
-    nvs_close(handle);
     if (err == ESP_OK)
     {
         current_timezone_index = (int)saved_index;
     }
+
+    uint8_t saved_startup_page = STARTUP_PAGE_HOME;
+    err = nvs_get_u8(handle, SETTINGS_NVS_STARTUP_PAGE_KEY, &saved_startup_page);
+    if (err == ESP_OK && saved_startup_page < STARTUP_PAGE_COUNT)
+    {
+        current_startup_page = (startup_page_t)saved_startup_page;
+    }
+    nvs_close(handle);
 }
 
 static void settings_save_timezone(int index)
@@ -330,19 +369,64 @@ static void settings_save_timezone(int index)
     nvs_close(handle);
 }
 
+static esp_err_t settings_save_startup_page(startup_page_t page)
+{
+    if (page < STARTUP_PAGE_HOME || page >= STARTUP_PAGE_COUNT)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    static bool nvs_ready = false;
+    if (!nvs_ready)
+    {
+        esp_err_t init_err = nvs_flash_init();
+        if (init_err == ESP_ERR_NVS_NO_FREE_PAGES || init_err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+        {
+            ESP_ERROR_CHECK(nvs_flash_erase());
+            init_err = nvs_flash_init();
+        }
+        if (init_err != ESP_OK)
+        {
+            return init_err;
+        }
+        nvs_ready = true;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    err = nvs_set_u8(handle, SETTINGS_NVS_STARTUP_PAGE_KEY, (uint8_t)page);
+    if (err == ESP_OK)
+    {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
 void settings_initialize(void)
 {
     if (settings_initialized) {
         return;
     }
 
-    settings_load_timezone();
+    settings_load_persisted_values();
     size_t timezone_count = sizeof(timezone_values) / sizeof(timezone_values[0]);
     if (current_timezone_index < 0 || (size_t)current_timezone_index >= timezone_count) {
         current_timezone_index = 0;
     }
     apply_timezone_by_index(current_timezone_index);
     settings_initialized = true;
+}
+
+startup_page_t settings_get_startup_page(void)
+{
+    settings_initialize();
+    return current_startup_page;
 }
 
 static void update_fan_controls(void)
@@ -678,7 +762,7 @@ void settings_screen_create(void)
     lv_obj_align(brightness_value_label, LV_ALIGN_TOP_LEFT, 600, 26);
 
     lv_obj_t *timezone_section = lv_obj_create(main_cont);
-    lv_obj_set_size(timezone_section, 680, 50);
+    lv_obj_set_size(timezone_section, 680, 100);
     lv_obj_align(timezone_section, LV_ALIGN_TOP_MID, 0, 430);
     lv_obj_set_style_bg_opa(timezone_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(timezone_section, 0, 0);
@@ -699,12 +783,27 @@ void settings_screen_create(void)
     style_settings_dropdown(timezone_dropdown, &lv_font_montserrat_16);
     lv_obj_add_event_cb(timezone_dropdown, settings_timezone_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
+    lv_obj_t *startup_page_title = lv_label_create(timezone_section);
+    lv_label_set_text(startup_page_title, "Default Page:");
+    lv_obj_set_style_text_color(startup_page_title, COLOR_TEXT_PRIMARY, 0);
+    lv_obj_set_style_text_font(startup_page_title, &lv_font_montserrat_18, 0);
+    lv_obj_align(startup_page_title, LV_ALIGN_TOP_LEFT, 0, 50);
+
+    startup_page_dropdown = lv_dropdown_create(timezone_section);
+    lv_obj_set_size(startup_page_dropdown, 300, 34);
+    lv_obj_align(startup_page_dropdown, LV_ALIGN_TOP_LEFT, 140, 46);
+    lv_dropdown_set_options(startup_page_dropdown, startup_page_options);
+    lv_dropdown_set_selected(startup_page_dropdown, startup_page_dropdown_index(current_startup_page));
+    style_settings_dropdown(startup_page_dropdown, &lv_font_montserrat_16);
+    lv_obj_add_event_cb(startup_page_dropdown, settings_startup_page_changed,
+                        LV_EVENT_VALUE_CHANGED, NULL);
+
     display_control_config_t display_config;
     display_control_get_config(&display_config);
 
     lv_obj_t *display_section = lv_obj_create(main_cont);
     lv_obj_set_size(display_section, 680, 250);
-    lv_obj_align(display_section, LV_ALIGN_TOP_MID, 0, 480);
+    lv_obj_align(display_section, LV_ALIGN_TOP_MID, 0, 530);
     lv_obj_set_style_bg_opa(display_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(display_section, 0, 0);
     lv_obj_set_style_pad_all(display_section, 10, 0);
@@ -782,7 +881,7 @@ void settings_screen_create(void)
     // OTA Update Section
     lv_obj_t *ota_section = lv_obj_create(main_cont);
     lv_obj_set_size(ota_section, 680, 160);
-    lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 740);
+    lv_obj_align(ota_section, LV_ALIGN_TOP_MID, 0, 790);
     lv_obj_set_style_bg_opa(ota_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ota_section, 0, 0);
     lv_obj_set_style_pad_all(ota_section, 10, 0);
@@ -876,6 +975,7 @@ void settings_screen_destroy(void)
         brightness_slider = NULL;
         brightness_value_label = NULL;
         timezone_dropdown = NULL;
+        startup_page_dropdown = NULL;
         display_schedule_checkbox = NULL;
         display_off_dropdown = NULL;
         display_on_dropdown = NULL;
@@ -1064,6 +1164,30 @@ void settings_timezone_changed(lv_event_t *e)
     current_timezone_index = (int)lv_dropdown_get_selected(dropdown);
     apply_timezone_by_index(current_timezone_index);
     settings_save_timezone(current_timezone_index);
+}
+
+void settings_startup_page_changed(lv_event_t *e)
+{
+    lv_obj_t *dropdown = lv_event_get_target(e);
+    uint16_t selected_index = lv_dropdown_get_selected(dropdown);
+    if (selected_index >= sizeof(startup_page_option_values) / sizeof(startup_page_option_values[0]))
+    {
+        lv_dropdown_set_selected(dropdown, startup_page_dropdown_index(current_startup_page));
+        return;
+    }
+
+    startup_page_t selected = startup_page_option_values[selected_index];
+    esp_err_t err = settings_save_startup_page(selected);
+    if (err == ESP_OK)
+    {
+        current_startup_page = selected;
+        ESP_LOGI(TAG, "Default startup page saved: %u", (unsigned)selected);
+    }
+    else
+    {
+        lv_dropdown_set_selected(dropdown, startup_page_dropdown_index(current_startup_page));
+        ESP_LOGE(TAG, "Failed to save default startup page: %s", esp_err_to_name(err));
+    }
 }
 
 static void settings_display_schedule_changed(lv_event_t *e)

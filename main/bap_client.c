@@ -15,11 +15,16 @@
 #include "bap_client.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
+#include "bap_line_buffer.h"
+#include "bap_connection_policy.h"
 #include "bap_parser.h"
 
 static const char *TAG = "BAP_CLIENT";
 
-static bool subscriptions_sent = false;
+static volatile bool subscriptions_sent = false;
+static volatile uint32_t subscriptions_sent_at = 0;
+#define BAP_RESPONSE_TIMEOUT_MS 12000U
+#define BAP_MONITOR_INTERVAL_MS 2000U
 static bool system_info_requested = false;
 static bool subscribed_hashrate = false;
 static bool subscribed_temperature = false;
@@ -30,7 +35,7 @@ static bool subscribed_best_difficulty = false;
 static bool subscribed_wifi = false;
 static bool subscribed_block_height = false;
 static bool subscribed_wifi_password = false;
-static uint32_t last_response_time = 0;
+static volatile uint32_t last_response_time = 0;
 
 // Task handles for suspend/resume
 static TaskHandle_t uart_receive_task_handle = NULL;
@@ -251,6 +256,7 @@ bool bap_client_is_connected(void) {
 void bap_client_reset_connection_state(void) {
     ESP_LOGI(TAG, "Resetting BAP connection state");
     subscriptions_sent = false;
+    subscriptions_sent_at = 0;
     system_info_requested = false;
     subscribed_hashrate = false;
     subscribed_temperature = false;
@@ -434,13 +440,16 @@ static void uart_send_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(100));  // Wait a bit
     bap_request_system_info();
     
+    subscriptions_sent_at = xTaskGetTickCount();
     subscriptions_sent = true;
     ESP_LOGI(TAG, "All subscriptions sent, task exiting");
     vTaskDelete(NULL);
 }
 
 static void uart_receive_task(void *pvParameters) {
-    static uint8_t buffer[1024]; // Use constant instead of bap_uart_get_buffer_size()
+    static uint8_t buffer[1024];
+    bap_line_buffer_t line_buffer;
+    bap_line_buffer_init(&line_buffer);
     
     esp_err_t wdt_ret = esp_task_wdt_add(NULL);
     if (wdt_ret != ESP_OK) {
@@ -454,26 +463,20 @@ static void uart_receive_task(void *pvParameters) {
         
         int len = bap_uart_read(buffer, sizeof(buffer), 100);
         if (len > 0) {
-            buffer[len] = '\0';
-            
-            char *message_start = (char*)buffer;
-            char *message_end;
-            
-            while ((message_end = strstr(message_start, "\r\n")) != NULL) {
-                *message_end = '\0';
-                
-                if (message_start[0] == '$') {
-                    last_response_time = xTaskGetTickCount();
-                    bap_parse_and_handle_message(message_start);
+            for (int i = 0; i < len; i++) {
+                const char *message = NULL;
+                if (!bap_line_buffer_push(&line_buffer, buffer[i], &message) ||
+                    !message || message[0] != '$') {
+                    continue;
                 }
-                
-                message_start = message_end + 2; // Skip \r\n
-            }
-            
-            // Handle case where last message doesn't end with \r\n
-            if (strlen(message_start) > 0 && message_start[0] == '$') {
-                last_response_time = xTaskGetTickCount();
-                bap_parse_and_handle_message(message_start);
+
+                esp_err_t parse_ret = bap_parse_and_handle_message(message);
+                if (parse_ret == ESP_OK) {
+                    if (last_response_time == 0) {
+                        ESP_LOGI(TAG, "First valid BAP response received");
+                    }
+                    last_response_time = xTaskGetTickCount();
+                }
             }
         }
         
@@ -501,9 +504,12 @@ static void connection_monitor_task(void *pvParameters) {
         
         uint32_t current_time = xTaskGetTickCount();
         
-        // Check if we haven't received any response for 12 seconds
-        if (last_response_time > 0 && (current_time - last_response_time) > pdMS_TO_TICKS(12000)) {
-            ESP_LOGW(TAG, "No response for 12s, resetting connection state");
+        if (bap_connection_retry_due(subscriptions_sent,
+                                     subscriptions_sent_at,
+                                     last_response_time,
+                                     current_time,
+                                     pdMS_TO_TICKS(BAP_RESPONSE_TIMEOUT_MS))) {
+            ESP_LOGW(TAG, "BAP response deadline expired; retrying subscriptions");
             
             bap_client_reset_connection_state();
             
@@ -515,8 +521,8 @@ static void connection_monitor_task(void *pvParameters) {
             }
         }
         
-        // Check every 10 seconds, but reset watchdog more frequently
-        for (int i = 0; i < 100; i++) {
+        // Keep the response deadline bounded while servicing the watchdog.
+        for (int i = 0; i < (int)(BAP_MONITOR_INTERVAL_MS / 100U); i++) {
             vTaskDelay(pdMS_TO_TICKS(100));
             if (wdt_ret == ESP_OK) {
                 esp_task_wdt_reset();

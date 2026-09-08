@@ -9,6 +9,16 @@ typedef enum {
     PERFORMANCE_HIGH
 } performance_mode_t;
 
+typedef enum {
+    STARTUP_PAGE_HOME = 0,
+    STARTUP_PAGE_PRICE,
+    STARTUP_PAGE_BLOCKS,
+    STARTUP_PAGE_MEMPOOL,
+    STARTUP_PAGE_CLOCK,
+    STARTUP_PAGE_HASHRATE,
+    STARTUP_PAGE_COUNT
+} startup_page_t;
+
 typedef struct {
     performance_mode_t performance_mode;
     bool auto_fan_control;
@@ -21,6 +31,7 @@ void settings_initialize(void);
 void settings_screen_destroy(void);
 lv_obj_t* settings_get_screen(void);
 void settings_update_info(const settings_info_t* info);
+startup_page_t settings_get_startup_page(void);
 
 void settings_performance_low_clicked(lv_event_t * e);
 void settings_performance_medium_clicked(lv_event_t * e);
@@ -30,6 +41,7 @@ void settings_fan_slider_changed(lv_event_t * e);
 void settings_fan_save_clicked(lv_event_t * e);
 void settings_brightness_slider_changed(lv_event_t * e);
 void settings_timezone_changed(lv_event_t * e);
+void settings_startup_page_changed(lv_event_t * e);
 void settings_home_clicked(lv_event_t * e);
 void settings_block_clicked(lv_event_t * e);
 void settings_clock_clicked(lv_event_t * e);
