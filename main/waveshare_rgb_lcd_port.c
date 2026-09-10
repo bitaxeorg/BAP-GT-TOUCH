@@ -4,6 +4,9 @@ static const char *TAG = "example";
 
 static uint8_t current_brightness = LCD_BACKLIGHT_DEFAULT_BRIGHTNESS;
 static bool backlight_initialized = false;
+#if CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_GT911
+static i2c_master_bus_handle_t touch_i2c_bus = NULL;
+#endif
 
 // VSYNC event callback function
 IRAM_ATTR static bool rgb_lcd_on_vsync_event(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *edata, void *user_ctx)
@@ -17,22 +20,16 @@ IRAM_ATTR static bool rgb_lcd_on_vsync_event(esp_lcd_panel_handle_t panel, const
  */
 static esp_err_t i2c_master_init(void)
 {
-    int i2c_master_port = I2C_MASTER_NUM;
-
-    i2c_config_t i2c_conf = {
-        .mode = I2C_MODE_MASTER,
+    const i2c_master_bus_config_t i2c_conf = {
+        .i2c_port = I2C_MASTER_NUM,
         .sda_io_num = I2C_MASTER_SDA_IO,
         .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
     };
 
-    // Configure I2C parameters
-    i2c_param_config(i2c_master_port, &i2c_conf);
-
-    // Install I2C driver
-    return i2c_driver_install(i2c_master_port, i2c_conf.mode, 0, 0, 0);
+    return i2c_new_master_bus(&i2c_conf, &touch_i2c_bus);
 }
 
 // GPIO initialization
@@ -103,9 +100,10 @@ static esp_err_t init_gt911_touch_with_fallback(esp_lcd_touch_handle_t *out_tp_h
     for (size_t i = 0; i < sizeof(gt911_addrs) / sizeof(gt911_addrs[0]); i++) {
         esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
         tp_io_config.dev_addr = gt911_addrs[i];
+        tp_io_config.scl_speed_hz = I2C_MASTER_FREQ_HZ;
 
         ESP_LOGI(TAG, "Initialize I2C panel IO for GT911 at 0x%02X", (unsigned int)tp_io_config.dev_addr);
-        esp_err_t ret = esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_MASTER_NUM, &tp_io_config, &tp_io_handle);
+        esp_err_t ret = esp_lcd_new_panel_io_i2c(touch_i2c_bus, &tp_io_config, &tp_io_handle);
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "GT911 I2C IO init failed at 0x%02X: %s", (unsigned int)tp_io_config.dev_addr, esp_err_to_name(ret));
             continue;
