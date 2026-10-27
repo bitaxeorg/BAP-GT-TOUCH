@@ -1,0 +1,26 @@
+name: Verify pinned CA bundle
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python tools/test_ca_bundle.py
+      - name: Verify price-provider chain building with the release SDK
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4.1
+          target: esp32s3
+          command: python tools/test_price_ca.py --idf-path "$IDF_PATH"
+          path: '.'

@@ -15,3 +15,15 @@ if(NOT DEFINED PROJECT_VER)
 endif()
 
 project(lvgl_porting)
+
+# Custom bundles are additive unless the SDK's default and deprecated lists are disabled.
+# Existing sdkconfig files override sdkconfig.defaults, so fail closed on stale settings.
+if(NOT CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
+   OR NOT CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE
+   OR NOT CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE
+   OR CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL
+   OR CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN
+   OR CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEPRECATED_LIST
+   OR NOT CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH STREQUAL "certificates/cacert-2026-10-20.pem")
+    message(FATAL_ERROR "BAP-GT-TOUCH requires its pinned CA bundle. Update the certificate bundle settings in sdkconfig to match sdkconfig.defaults; see certificates/README.md.")
+endif()

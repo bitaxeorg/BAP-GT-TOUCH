@@ -40,7 +40,7 @@ jobs:
         with:
           esp_idf_version: v5.4.1
           target: esp32s3
-          command: GITHUB_ACTIONS="true" idf.py -DPROJECT_VER="${{ steps.version.outputs.VERSION }}" build
+          command: python tools/test_ca_bundle.py && python tools/test_price_ca.py --idf-path "$IDF_PATH" && GITHUB_ACTIONS="true" idf.py -DPROJECT_VER="${{ steps.version.outputs.VERSION }}" build && python tools/test_ca_bundle.py --build-dir build
           path: '.'
       - uses: actions/setup-python@v5
         with:
