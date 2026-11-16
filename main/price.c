@@ -12,7 +12,7 @@
 #include "esp_http_client.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
-#include "esp_crt_bundle.h"
+#include "price_root_ca.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdlib.h>
@@ -242,7 +242,7 @@ static bool price_fetch_from_url(const char *url)
     esp_http_client_config_t config = {
         .url = url,
         .event_handler = price_http_event_handler,
-        .crt_bundle_attach = esp_crt_bundle_attach,
+        .cert_pem = price_root_ca,
         .timeout_ms = 5000,
     };
 
