@@ -17,6 +17,8 @@ jobs:
         with:
           python-version: '3.10'
       - run: python tools/test_ca_bundle.py
+      - name: Install Settings contract test dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Test display policies
         run: |
           cc -std=c11 -Wall -Wextra -Werror -I main tests/test_display_schedule.c main/display_schedule.c -o "$RUNNER_TEMP/display-schedule"
