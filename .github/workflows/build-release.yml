@@ -38,7 +38,7 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.4.1
+          esp_idf_version: v5.5.6
           target: esp32s3
           command: python tools/test_ca_bundle.py && python tools/test_price_ca.py --idf-path "$IDF_PATH" && GITHUB_ACTIONS="true" idf.py -DPROJECT_VER="${{ steps.version.outputs.VERSION }}" build && python tools/test_ca_bundle.py --build-dir build
           path: '.'

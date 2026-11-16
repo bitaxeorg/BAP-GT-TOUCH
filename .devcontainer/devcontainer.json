@@ -1,6 +1,6 @@
 {
-    "name": "ESP-IDF 5.4.1 Development",
-    "image": "espressif/idf:v5.4.1",
+    "name": "ESP-IDF 5.5.6 Development",
+    "image": "espressif/idf:v5.5.6",
     "workspaceFolder": "/workspace",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
     "customizations": {
@@ -13,7 +13,7 @@
             "settings": {
                 "idf.espIdfPath": "/opt/esp/idf",
                 "idf.toolsPath": "/opt/esp",
-                "idf.pythonBinPath": "/opt/esp/python_env/idf5.4_py3.12_env/bin/python",
+                "idf.pythonBinPath": "/opt/esp/python_env/idf5.5_py3.12_env/bin/python",
                 "terminal.integrated.defaultProfile.linux": "bash",
                 "terminal.integrated.profiles.linux": {
                     "bash": {

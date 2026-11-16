@@ -4,7 +4,7 @@
 [![ST7262](https://img.shields.io/badge/LCD-ST7262-green)](https://ifan-display.com/product/5-inch-touch-screen-st7262-driver-ctp-gt911-800x480/)
 [![GT911](https://img.shields.io/badge/Touch-GT911-orange)](https://goodix.com/)
 [![LVGL](https://img.shields.io/badge/GUI-LVGL-purple)](https://lvgl.io/)
-[![ESP-IDF](https://img.shields.io/badge/Framework-ESP--IDF_5.4.1-red)](https://docs.espressif.com/projects/esp-idf/en/latest/)
+[![ESP-IDF](https://img.shields.io/badge/Framework-ESP--IDF_5.5.6-red)](https://docs.espressif.com/projects/esp-idf/en/latest/)
 
 A sophisticated touchscreen display addon for Bitaxe miners, featuring a 4.3-inch ST7262 RGB LCD with GT911 capacitive touch controller. This is the **first official addon** to utilize the **Bitaxe Accessory Port (BAP)** for seamless integration with Bitaxe hardware.
 
@@ -73,7 +73,7 @@ Protocol:     Custom BAP protocol for Bitaxe communication
 
 ### Prerequisites
 
-- **ESP-IDF 5.4.1**: [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
+- **ESP-IDF 5.5.6**: [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 - **Compatible Bitaxe**: Any Bitaxe model with BAP support
 - **Hardware**: Assembled Bitaxe GT Touch display module
 
@@ -319,7 +319,7 @@ GT911 capacitive touch controller features:
 ### Build Issues
 
 **Problem**: Compilation errors
-- Ensure ESP-IDF 5.4.1 is properly installed
+- Ensure ESP-IDF 5.5.6 is properly installed
 - Run `idf.py clean` before rebuilding
 - Check all submodules are properly initialized
 
