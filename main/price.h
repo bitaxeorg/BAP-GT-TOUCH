@@ -4,6 +4,7 @@
 #include "lvgl.h"
 
 void price_screen_create(void);
+void price_service_start(void);
 void price_screen_destroy(void);
 lv_obj_t *price_get_screen(void);
 
