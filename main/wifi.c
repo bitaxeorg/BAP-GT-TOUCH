@@ -299,6 +299,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         scan_event_received = true;
     } else if ((event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) ||
                (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)) {
+        if (event_base == IP_EVENT) {
+            // Start IPv6: a link-local address enables router discovery and SLAAC.
+            esp_netif_create_ip6_linklocal(wifi_sta_netif);
+        }
         /* The LVGL task owns connection state and all widget updates. */
         xEventGroupSetBits(wifi_link_events, WIFI_LINK_CHANGED);
     }

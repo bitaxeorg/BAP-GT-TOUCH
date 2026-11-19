@@ -1,3 +1,4 @@
+#include "net_http.h"
 #include "price.h"
 #include "home.h"
 #include "block.h"
@@ -264,15 +265,8 @@ static bool price_fetch_from_url(const char *url)
     price_http_len = 0;
     price_http_buf[0] = '\0';
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client)
-    {
-        return false;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status = esp_http_client_get_status_code(client);
-    esp_http_client_cleanup(client);
+    int status = 0;
+    esp_err_t err = net_http_perform(&config, &status);
 
     if (err != ESP_OK || status < 200 || status >= 300 || price_http_len == 0)
     {

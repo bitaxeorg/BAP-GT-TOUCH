@@ -1,3 +1,4 @@
+#include "net_http.h"
 #include "mempool.h"
 #include "custom_fonts.h"
 #include "home.h"
@@ -315,16 +316,8 @@ static bool mempool_fetch_once(void)
     mempool_http_len = 0;
     mempool_http_buf[0] = '\0';
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client)
-    {
-        wifi_https_release();
-        return false;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status = esp_http_client_get_status_code(client);
-    esp_http_client_cleanup(client);
+    int status = 0;
+    esp_err_t err = net_http_perform(&config, &status);
     wifi_https_release();
 
     if (err != ESP_OK || status < 200 || status >= 300 || mempool_http_len == 0)

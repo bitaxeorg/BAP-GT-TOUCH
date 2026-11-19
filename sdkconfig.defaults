@@ -52,3 +52,4 @@ CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-2026-10-20.pe
 
 # Preserve pre-5.5 PSRAM sleep behavior; half-sleep remains opt-in.
 CONFIG_PM_SLP_SPIRAM_HALFSLEEP_ENABLED=n
+CONFIG_LWIP_IPV6_AUTOCONFIG=y
