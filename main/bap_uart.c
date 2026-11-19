@@ -17,6 +17,7 @@ static const char *TAG = "BAP_UART";
 #define BAP_BUF_SIZE 1024
 #define GPIO_BAP_RX 6
 #define GPIO_BAP_TX 16
+#define BAP_TX_TIMEOUT_MS 250
 
 esp_err_t bap_uart_init(void) {
     ESP_LOGI(TAG, "Starting UART initialization...");
@@ -44,19 +45,11 @@ esp_err_t bap_uart_init(void) {
         return ret;
     }
     
-    ESP_LOGI(TAG, "Setting UART pins individually (TX:%d, RX:%d)...", GPIO_BAP_TX, GPIO_BAP_RX);
-    
-    ESP_LOGI(TAG, "Setting TX pin %d...", GPIO_BAP_TX);
-    ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    ESP_LOGI(TAG, "Setting UART pins (TX:%d, RX:%d)...", GPIO_BAP_TX, GPIO_BAP_RX);
+    ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, GPIO_BAP_RX,
+                       UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "UART TX pin set failed: %s", esp_err_to_name(ret));
-        return ret;
-    }
-    
-    ESP_LOGI(TAG, "Setting RX pin %d...", GPIO_BAP_RX);
-    ret = uart_set_pin(BAP_UART_NUM, UART_PIN_NO_CHANGE, GPIO_BAP_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "UART RX pin set failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "UART pin setup failed: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -78,6 +71,12 @@ esp_err_t bap_uart_write(const char *data, size_t length) {
     if (bytes_written != length) {
         ESP_LOGW(TAG, "UART write incomplete: %d/%d bytes", bytes_written, length);
         return ESP_ERR_INVALID_SIZE;
+    }
+
+    esp_err_t ret = uart_wait_tx_done(BAP_UART_NUM, pdMS_TO_TICKS(BAP_TX_TIMEOUT_MS));
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "UART transmit did not complete: %s", esp_err_to_name(ret));
+        return ret;
     }
     
     return ESP_OK;

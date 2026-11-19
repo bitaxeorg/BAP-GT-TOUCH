@@ -1,3 +1,4 @@
+#include "net_http.h"
 #include "price.h"
 #include "home.h"
 #include "block.h"
@@ -9,10 +10,11 @@
 #include "custom_fonts.h"
 #include "lvgl_port.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
-#include "esp_crt_bundle.h"
+#include "price_root_ca.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdlib.h>
@@ -151,9 +153,15 @@ void price_screen_create(void)
 
     apply_cached_price();
 
-    if (price_task_handle == NULL)
-    {
-        xTaskCreate(price_task, "price_fetch_task", 4096, NULL, 5, &price_task_handle);
+    price_service_start();
+}
+
+void price_service_start(void)
+{
+    if (price_task_handle != NULL) return;
+    if (xTaskCreate(price_task, "price_fetch_task", 4096, NULL, 5, &price_task_handle) != pdPASS) {
+        price_task_handle = NULL;
+        ESP_LOGE("price", "Failed to start price refresh service");
     }
 }
 
@@ -196,12 +204,20 @@ static bool price_fetch_once(void)
         return false;
     }
 
+    if (!wifi_https_acquire(15000))
+    {
+        return false;
+    }
+
     if (price_fetch_from_url(PRICE_API_URL))
     {
+        wifi_https_release();
         return true;
     }
 
-    return price_fetch_from_url(PRICE_API_FALLBACK_URL);
+    bool fetched = price_fetch_from_url(PRICE_API_FALLBACK_URL);
+    wifi_https_release();
+    return fetched;
 }
 
 static bool price_ensure_netif(void)
@@ -242,22 +258,15 @@ static bool price_fetch_from_url(const char *url)
     esp_http_client_config_t config = {
         .url = url,
         .event_handler = price_http_event_handler,
-        .crt_bundle_attach = esp_crt_bundle_attach,
+        .cert_pem = price_root_ca,
         .timeout_ms = 5000,
     };
 
     price_http_len = 0;
     price_http_buf[0] = '\0';
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client)
-    {
-        return false;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status = esp_http_client_get_status_code(client);
-    esp_http_client_cleanup(client);
+    int status = 0;
+    esp_err_t err = net_http_perform(&config, &status);
 
     if (err != ESP_OK || status < 200 || status >= 300 || price_http_len == 0)
     {
@@ -413,6 +422,17 @@ static void price_task(void *arg)
             continue;
         }
 
+        if (!wifi_is_time_ready())
+        {
+            if (lvgl_port_lock(50))
+            {
+                price_set_status("SYNCING TIME");
+                lvgl_port_unlock();
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
         if (lvgl_port_lock(50))
         {
             price_set_status("LOADING...");
@@ -420,6 +440,7 @@ static void price_task(void *arg)
         }
 
         bool updated = price_fetch_once();
+        if (updated) ESP_LOGI("price", "Price cache refreshed");
         if (lvgl_port_lock(50))
         {
             if (updated)
